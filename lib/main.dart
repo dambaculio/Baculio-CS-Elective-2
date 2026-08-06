@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'InstagramPage.dart'; // Updated import to match the exact file name
-
+import 'InstagramPage.dart';
 void main() {
   runApp(const InstagramCloneApp());
 }
@@ -21,7 +20,8 @@ class InstagramCloneApp extends StatelessWidget {
           iconTheme: IconThemeData(color: Colors.black),
           foregroundColor: Colors.black,
         ),
-      ),home: const InstagramPage(),
+      ),
+      home: const InstagramPage(),
     );
   }
 }
