@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'InstagramPage.dart';
 void main() {
-  runApp(const InstagramCloneApp());
+  runApp(const MyApp());
 }
 
-class InstagramCloneApp extends StatelessWidget {
-  const InstagramCloneApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Instagram Clone',
+      title: 'Instagram Activity',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         scaffoldBackgroundColor: Colors.white,
