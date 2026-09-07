@@ -6,20 +6,22 @@ import '../models/flower.dart';
 import '../theme/design_theme.dart';
 import '../utils/responsive.dart';
 import '../widgets/flower_card.dart';
+import '../widgets/floating_cart_button.dart';
 
 enum SortOption { defaultOrder, priceLowHigh, priceHighLow }
 
-/// StatefulWidget (Lecture 8): search text, sort order, and the
-/// selected category are all mutable UI state, managed here with
-/// setState() — the same pattern as the counter example.
 class HomeScreen extends StatefulWidget {
   final ThemeMode themeMode;
   final VoidCallback onToggleTheme;
+  final int cartItemCount;
+  final VoidCallback onCartTap;
 
   const HomeScreen({
     super.key,
     required this.themeMode,
     required this.onToggleTheme,
+    required this.cartItemCount,
+    required this.onCartTap,
   });
 
   @override
@@ -72,16 +74,8 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text("Shai's Creation", style: DesignTheme.logoStyle),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.shopping_cart_outlined),
-            tooltip: 'Cart (coming soon)',
-            onPressed: null,
-          ),
-          IconButton(
-            icon: const Icon(Icons.chat_bubble_outline),
-            tooltip: 'Message seller (coming soon)',
-            onPressed: null,
-          ),
+          // Cart and chat icons removed from here — cart now lives
+          // as a floating button (see floatingActionButton below).
           IconButton(
             icon: Icon(
               widget.themeMode == ThemeMode.light
@@ -93,17 +87,16 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+      floatingActionButton: FloatingCartButton(
+        itemCount: widget.cartItemCount,
+        onTap: widget.onCartTap,
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Search bar — text/hint/icon colors are hardcoded to
-              // AppColors.textColor so they stay dark/legible against
-              // the pale pink fill in BOTH light and dark mode
-              // (dark mode's default light text color was nearly
-              // invisible against this fill).
               Row(
                 children: [
                   Expanded(
@@ -125,25 +118,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  // Filter button — now also holds the sort options
-                  // that used to live in a separate dropdown.
                   PopupMenuButton<SortOption>(
                     tooltip: 'Sort',
                     initialValue: _sortOption,
                     onSelected: (value) => setState(() => _sortOption = value),
                     itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: SortOption.defaultOrder,
-                        child: Text('Default'),
-                      ),
-                      PopupMenuItem(
-                        value: SortOption.priceLowHigh,
-                        child: Text('Price: Low–High'),
-                      ),
-                      PopupMenuItem(
-                        value: SortOption.priceHighLow,
-                        child: Text('Price: High–Low'),
-                      ),
+                      PopupMenuItem(value: SortOption.defaultOrder, child: Text('Default')),
+                      PopupMenuItem(value: SortOption.priceLowHigh, child: Text('Price: Low–High')),
+                      PopupMenuItem(value: SortOption.priceHighLow, child: Text('Price: High–Low')),
                     ],
                     child: CircleAvatar(
                       radius: 24,
@@ -154,7 +136,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               const SizedBox(height: 14),
-              // Category nav bar
               SizedBox(
                 height: 40,
                 child: ListView.separated(
@@ -188,10 +169,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Expanded(
                 child: flowers.isEmpty
                     ? Center(
-                        child: Text(
-                          'No items found.',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
+                        child: Text('No items found.', style: Theme.of(context).textTheme.bodyMedium),
                       )
                     : GridView.builder(
                         padding: const EdgeInsets.only(bottom: 16),

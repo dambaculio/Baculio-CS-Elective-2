@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'models/cart.dart';
+import 'models/flower.dart';
 import 'screens/home_screen.dart';
+import 'screens/order_list.dart';
 import 'screens/product_detail_screen.dart';
 import 'theme/design_theme.dart';
 
@@ -9,8 +12,9 @@ void main() {
   runApp(const MyApp());
 }
 
-/// Root widget.
-/// StatefulWidget because it manages the current ThemeMode.
+/// Root widget. StatefulWidget because it owns both the current
+/// ThemeMode AND the shared cart — both are mutable state that the
+/// whole app depends on, so both are lifted here and passed down.
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
@@ -21,21 +25,56 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.light;
 
-  /// Toggles between light and dark mode.
   void _toggleTheme() {
     setState(() {
       _themeMode =
-          _themeMode == ThemeMode.light
-              ? ThemeMode.dark
-              : ThemeMode.light;
+          _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
     });
   }
 
-  /// Navigation 2.0 using go_router.
-  ///
-  /// Routes:
-  /// /               -> Home Screen
-  /// /product/:id    -> Product Details Screen
+  // ---- Cart state ----
+  final List<CartItem> _cartItems = [];
+
+  int get _cartItemCount =>
+      _cartItems.fold(0, (sum, item) => sum + item.quantity);
+
+  void _addToCart(Flower product, int quantity) {
+    setState(() {
+      final index = _cartItems.indexWhere((item) => item.product.id == product.id);
+      if (index >= 0) {
+        _cartItems[index].quantity += quantity;
+      } else {
+        _cartItems.add(CartItem(product: product, quantity: quantity));
+      }
+    });
+  }
+
+  void _updateCartQuantity(String productId, int newQuantity) {
+    setState(() {
+      final index = _cartItems.indexWhere((item) => item.product.id == productId);
+      if (index < 0) return;
+      if (newQuantity <= 0) {
+        _cartItems.removeAt(index);
+      } else {
+        _cartItems[index].quantity = newQuantity;
+      }
+    });
+  }
+
+  void _removeFromCart(String productId) {
+    setState(() {
+      _cartItems.removeWhere((item) => item.product.id == productId);
+    });
+  }
+
+  void _clearCart() {
+    setState(() => _cartItems.clear());
+  }
+
+  /// Navigation 2.0 (go_router) route table:
+  ///   /              -> Home (Product Grid)
+  ///   /product/:id   -> Product Detail Page
+  ///   /cart          -> Order List Page
   late final GoRouter _router = GoRouter(
     routes: [
       GoRoute(
@@ -43,18 +82,30 @@ class _MyAppState extends State<MyApp> {
         builder: (context, state) => HomeScreen(
           themeMode: _themeMode,
           onToggleTheme: _toggleTheme,
+          cartItemCount: _cartItemCount,
+          onCartTap: () => context.push('/cart'),
         ),
       ),
-
       GoRoute(
         path: '/product/:id',
         builder: (context, state) {
           final id = state.pathParameters['id']!;
-
           return ProductDetailScreen(
             productId: id,
+            cartItemCount: _cartItemCount,
+            onAddToCart: _addToCart,
+            onCartTap: () => context.push('/cart'),
           );
         },
+      ),
+      GoRoute(
+        path: '/cart',
+        builder: (context, state) => OrderListScreen(
+          cartItems: _cartItems,
+          onUpdateQuantity: _updateCartQuantity,
+          onRemove: _removeFromCart,
+          onCheckoutComplete: _clearCart,
+        ),
       ),
     ],
   );
@@ -64,17 +115,9 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp.router(
       title: "Shai's Creation",
       debugShowCheckedModeBanner: false,
-
-      // Light theme
       theme: DesignTheme.lightTheme,
-
-      // Dark theme
       darkTheme: DesignTheme.darkTheme,
-
-      // Current theme
       themeMode: _themeMode,
-
-      // Navigation 2.0
       routerConfig: _router,
     );
   }
