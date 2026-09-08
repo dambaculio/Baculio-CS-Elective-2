@@ -3,7 +3,6 @@ import 'package:flutter_application_1/models/flower.dart';
 
 import '../data/flower_data.dart';
 import '../theme/design_theme.dart';
-import '../widgets/floating_cart_button.dart';
 import '../widgets/product_image.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -30,6 +29,8 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _quantity = 1;
+  late int _displayedCartItemCount = widget.cartItemCount ?? 0;
+  String? _selectedColor;
   late bool _isFavorite = widget.isFavorite;
 
   @override
@@ -37,6 +38,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isFavorite != widget.isFavorite) {
       _isFavorite = widget.isFavorite;
+    }
+    if (oldWidget.cartItemCount != widget.cartItemCount) {
+      _displayedCartItemCount = widget.cartItemCount ?? 0;
     }
   }
 
@@ -62,20 +66,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
+    final supportsColorChoice = switch (product.category.toLowerCase()) {
+      'flowers' || 'wrappers' || 'ribbon' || 'ribbons' => true,
+      _ => false,
+    };
 
     return Scaffold(
-      floatingActionButton:
-          widget.onCartTap == null || widget.cartItemCount == null
-          ? null
-          : FloatingCartButton(
-              itemCount: widget.cartItemCount!,
-              onTap: widget.onCartTap!,
-            ),
       body: SafeArea(
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
               child: SizedBox(
                 height: 330,
                 width: double.infinity,
@@ -88,7 +89,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         imageUrl: product.imageUrl,
                         errorBuilder: (_, _, _) => Container(
                           color: AppColors.lightPink,
-                          child: const Icon(Icons.local_florist_outlined, size: 90),
+                          child: const Icon(
+                            Icons.local_florist_outlined,
+                            size: 90,
+                          ),
                         ),
                       ),
                       Positioned(
@@ -103,10 +107,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       Positioned(
                         top: 12,
                         right: 64,
-                        child: _CircleActionButton(
-                          icon: Icons.share_outlined,
-                          tooltip: 'Share',
-                          onPressed: () {},
+                        child: _CartActionButton(
+                          itemCount: _displayedCartItemCount,
+                          tooltip: 'Cart',
+                          onPressed: widget.onCartTap,
                         ),
                       ),
                       Positioned(
@@ -130,16 +134,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _PageDot(active: true, color: colorScheme.primary),
-                _PageDot(color: colorScheme.secondary),
-                _PageDot(color: colorScheme.secondary),
-                _PageDot(color: colorScheme.secondary),
-              ],
-            ),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
@@ -150,51 +144,75 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: Text(product.name, style: textTheme.headlineMedium),
+                          child: Text(
+                            product.name,
+                            style: textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                         Text(
                           '\u20b1${product.price.toStringAsFixed(2)}',
                           style: textTheme.headlineMedium?.copyWith(
                             color: colorScheme.primary,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Icon(Icons.star, color: colorScheme.primary, size: 22),
-                        Icon(Icons.star, color: colorScheme.primary, size: 22),
-                        Icon(Icons.star, color: colorScheme.primary, size: 22),
-                        Icon(Icons.star, color: colorScheme.primary, size: 22),
-                        Icon(Icons.star, color: colorScheme.primary, size: 22),
-                        const SizedBox(width: 8),
-                        Text('(128)', style: textTheme.bodyMedium),
-                      ],
-                    ),
                     const SizedBox(height: 24),
-                    Text('Description', style: textTheme.titleMedium),
+                    Text(
+                      'Description',
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 8),
-                    Text(product.description, style: textTheme.bodyLarge),
+                    Text(
+                      product.description,
+                      style: textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 20),
-                    Text('Flower Type', style: textTheme.titleMedium),
+                    Text(
+                      'Flower Type',
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     Chip(
-                      label: Text(product.category.isEmpty ? 'Flower' : product.category),
+                      label: Text(
+                        product.category.isEmpty ? 'Flower' : product.category,
+                      ),
                       backgroundColor: AppColors.lightPink,
                       side: BorderSide(color: colorScheme.secondary),
                     ),
-                    const SizedBox(height: 16),
-                    Text('Color', style: textTheme.titleMedium),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        _ColorSwatch(color: colorScheme.primary, selected: true),
-                        const _ColorSwatch(color: AppColors.pink),
-                        const _ColorSwatch(color: AppColors.lightPink),
-                        const _ColorSwatch(color: Colors.white),
-                      ],
-                    ),
+                    if (supportsColorChoice) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        'Color *',
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _colorOptions.map((option) {
+                          return _ColorSwatch(
+                            label: option.name,
+                            color: option.color,
+                            selected: _selectedColor == option.name,
+                            onTap: () =>
+                                setState(() => _selectedColor = option.name),
+                          );
+                        }).toList(),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -213,9 +231,60 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: widget.onAddToCart == null
+                      onPressed:
+                          widget.onAddToCart == null ||
+                              (supportsColorChoice && _selectedColor == null)
                           ? null
-                          : () => widget.onAddToCart!(product, _quantity),
+                          : () {
+                              setState(() {
+                                _displayedCartItemCount += _quantity;
+                              });
+                              widget.onAddToCart!(product, _quantity);
+                              ScaffoldMessenger.of(context)
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  SnackBar(
+                                    content: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.shopping_bag_outlined,
+                                          color: AppColors.hotPink,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            '${product.name} added to cart',
+                                            style: const TextStyle(
+                                              color: AppColors.textColor,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    behavior: SnackBarBehavior.floating,
+                                    margin: const EdgeInsets.fromLTRB(
+                                      16,
+                                      0,
+                                      16,
+                                      96,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 14,
+                                    ),
+                                    backgroundColor: AppColors.lightPink,
+                                    elevation: 6,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      side: const BorderSide(
+                                        color: AppColors.pink,
+                                      ),
+                                    ),
+                                    duration: const Duration(seconds: 3),
+                                  ),
+                                );
+                            },
                       icon: const Icon(Icons.shopping_cart_outlined),
                       label: const Text('Add to Cart'),
                       style: FilledButton.styleFrom(
@@ -257,6 +326,8 @@ class _CircleActionButton extends StatelessWidget {
       color: Colors.white.withValues(alpha: 0.88),
       shape: const CircleBorder(),
       child: IconButton(
+        constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+        padding: EdgeInsets.zero,
         tooltip: tooltip,
         onPressed: onPressed,
         icon: Icon(icon, color: iconColor ?? AppColors.textColor),
@@ -265,45 +336,108 @@ class _CircleActionButton extends StatelessWidget {
   }
 }
 
-class _PageDot extends StatelessWidget {
-  final bool active;
-  final Color color;
+class _CartActionButton extends StatelessWidget {
+  final int itemCount;
+  final String tooltip;
+  final VoidCallback? onPressed;
 
-  const _PageDot({this.active = false, required this.color});
+  const _CartActionButton({
+    required this.itemCount,
+    required this.tooltip,
+    required this.onPressed,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 3),
-      width: active ? 9 : 7,
-      height: active ? 9 : 7,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        _CircleActionButton(
+          icon: Icons.shopping_cart_outlined,
+          tooltip: tooltip,
+          onPressed: onPressed ?? () {},
+        ),
+        if (itemCount > 0)
+          Positioned(
+            right: -3,
+            top: -3,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                '$itemCount',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
 
 class _ColorSwatch extends StatelessWidget {
+  final String label;
   final Color color;
   final bool selected;
+  final VoidCallback onTap;
 
-  const _ColorSwatch({required this.color, this.selected = false});
+  const _ColorSwatch({
+    required this.label,
+    required this.color,
+    required this.onTap,
+    this.selected = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(right: 14),
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: selected ? AppColors.hotPink : Colors.transparent,
-          width: 2,
+    return Semantics(
+      label: label,
+      button: true,
+      selected: selected,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected ? AppColors.hotPink : Colors.black26,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
         ),
       ),
-      child: CircleAvatar(radius: 22, backgroundColor: color),
     );
   }
 }
+
+class _ColorOption {
+  final String name;
+  final Color color;
+
+  const _ColorOption(this.name, this.color);
+}
+
+const List<_ColorOption> _colorOptions = [
+  _ColorOption('White', Colors.white),
+  _ColorOption('Pink', AppColors.pink),
+  _ColorOption('Blue', Colors.blue),
+  _ColorOption('Red', Colors.red),
+  _ColorOption('Yellow', Colors.yellow),
+  _ColorOption('Green', Colors.green),
+];
 
 class _QuantityStepper extends StatelessWidget {
   final int quantity;

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../models/cart.dart';
 import '../theme/design_theme.dart';
 import '../widgets/product_image.dart';
+import 'order_confirmation.dart';
 
 /// Shows everything currently in the cart before checkout.
 /// Flow: Product Page -> Add to Cart -> Floating Cart -> Order List
@@ -41,82 +42,103 @@ class OrderListScreen extends StatelessWidget {
               separatorBuilder: (context, index) => const Divider(height: 24),
               itemBuilder: (context, index) {
                 final item = cartItems[index];
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: SizedBox(
-                        width: 64,
-                        height: 64,
-                        child: ProductImage(
-                          imageUrl: item.product.imageUrl,
-                          errorBuilder: (context, error, stackTrace) =>
-                              Container(
-                                color: AppColors.lightPink,
-                                child: const Icon(Icons.local_florist_outlined),
-                              ),
+                return Dismissible(
+                  key: ValueKey(item.product.id),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 24),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.delete,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                  onDismissed: (_) => onRemove(item.product.id),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: SizedBox(
+                          width: 64,
+                          height: 64,
+                          child: ProductImage(
+                            imageUrl: item.product.imageUrl,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  color: AppColors.lightPink,
+                                  child: const Icon(
+                                    Icons.local_florist_outlined,
+                                  ),
+                                ),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(item.product.name, style: textTheme.titleMedium),
-                          const SizedBox(height: 4),
-                          Text(
-                            '\u20b1${item.product.price.toStringAsFixed(2)} each',
-                            style: textTheme.bodyMedium,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Subtotal: \u20b1${item.subtotal.toStringAsFixed(2)}',
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: colorScheme.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Column(
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove_circle_outline),
-                              onPressed: () => onUpdateQuantity(
-                                item.product.id,
-                                item.quantity - 1,
-                              ),
-                            ),
                             Text(
-                              '${item.quantity}',
+                              item.product.name,
                               style: textTheme.titleMedium,
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.add_circle_outline),
-                              onPressed: () => onUpdateQuantity(
-                                item.product.id,
-                                item.quantity + 1,
+                            const SizedBox(height: 4),
+                            Text(
+                              '\u20b1${item.product.price.toStringAsFixed(2)} each',
+                              style: textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Subtotal: \u20b1${item.subtotal.toStringAsFixed(2)}',
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ],
                         ),
-                        TextButton.icon(
-                          onPressed: () => onRemove(item.product.id),
-                          icon: const Icon(Icons.delete_outline, size: 18),
-                          label: const Text('Remove'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.red,
+                      ),
+                      Column(
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.remove_circle_outline),
+                                onPressed: () => onUpdateQuantity(
+                                  item.product.id,
+                                  item.quantity - 1,
+                                ),
+                              ),
+                              Text(
+                                '${item.quantity}',
+                                style: textTheme.titleMedium,
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.add_circle_outline),
+                                onPressed: () => onUpdateQuantity(
+                                  item.product.id,
+                                  item.quantity + 1,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                tooltip: 'Remove item',
+                                color: Colors.red,
+                                onPressed: () => onRemove(item.product.id),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 );
               },
             ),
@@ -146,8 +168,15 @@ class OrderListScreen extends StatelessWidget {
                       child: ElevatedButton(
                         onPressed: () {
                           final totalSnapshot = _total;
+                          final itemsSnapshot = List<CartItem>.from(cartItems);
                           onCheckoutComplete();
-                          context.push('/confirmation', extra: totalSnapshot);
+                          context.push(
+                            '/confirmation',
+                            extra: OrderSummary(
+                              items: itemsSnapshot,
+                              total: totalSnapshot,
+                            ),
+                          );
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: colorScheme.primary,

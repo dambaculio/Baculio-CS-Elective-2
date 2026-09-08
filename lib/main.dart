@@ -128,13 +128,16 @@ class _MyAppState extends State<MyApp> {
       ),
       GoRoute(
         path: '/confirmation',
-        builder: (context, state) => OrderConfirmationScreen(
-          total: (state.extra as double?) ?? 0,
-          onBackToHome: () {
-            _clearCart();
-            context.go('/');
-          },
-        ),
+        builder: (context, state) {
+          final summary = state.extra is OrderSummary
+              ? state.extra! as OrderSummary
+              : const OrderSummary(items: [], total: 0);
+          return OrderConfirmationScreen(
+            total: summary.total,
+            cartItems: summary.items,
+            onBackToHome: () => context.go('/'),
+          );
+        },
       ),
     ],
   );

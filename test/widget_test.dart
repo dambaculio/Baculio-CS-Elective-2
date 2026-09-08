@@ -13,9 +13,10 @@ import 'package:flutter_application_1/main.dart';
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
     await tester.pumpWidget(const MyApp());
+    expect(find.text('All Flowers'), findsOneWidget);
     expect(find.text('Favorites'), findsOneWidget);
-    expect(find.byIcon(Icons.star), findsOneWidget);
-    expect(find.byIcon(Icons.shopping_cart), findsOneWidget);
+    expect(find.byIcon(Icons.star), findsNothing);
+    expect(find.byTooltip('Toggle light / dark mode'), findsOneWidget);
     expect(find.text('Buy Now'), findsNothing);
   });
 }
