@@ -1,17 +1,49 @@
-# flutter_application_1
+# Shai's Creation
 
-A new Flutter project.
+## Add Product Images
 
-## Getting Started
+1. In the project root, create this folder:
 
-This project is a starting point for a Flutter application.
+   `assets/images/`
 
-A few resources to get you started if this is your first Flutter project:
+2. Copy your image files into that folder, for example:
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+   ```text
+   assets/images/rose.jpg
+   assets/images/sunflower.jpg
+   assets/images/tulip.jpg
+   ```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+3. The `pubspec.yaml` file registers the whole folder:
+
+   ```yaml
+   flutter:
+     uses-material-design: true
+     assets:
+       - assets/images/
+   ```
+
+   Keep the indentation exactly as shown. Run `flutter pub get` after changing
+   `pubspec.yaml`.
+
+4. Reference an image by its path in `lib/data/flower_data.dart`:
+
+   ```dart
+   Flower(
+     id: '22',
+     name: 'Rose Garden',
+     price: 699,
+     imageUrl: 'assets/images/rose.jpg',
+     category: 'Flowers',
+   ),
+   ```
+
+5. The reusable `ProductImage` widget detects paths beginning with `assets/`
+   and loads them with the equivalent Flutter API:
+
+   ```dart
+   Image.asset('assets/images/rose.jpg')
+   ```
+
+You can also use `Image.asset` directly in any widget. File names and paths are
+case-sensitive, so the spelling must match the file exactly.

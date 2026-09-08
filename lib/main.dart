@@ -5,6 +5,7 @@ import 'models/cart.dart';
 import 'models/flower.dart';
 import 'screens/home_screen.dart';
 import 'screens/order_list.dart';
+import 'screens/order_confirmation.dart';
 import 'screens/product_detail_screen.dart';
 import 'theme/design_theme.dart';
 
@@ -27,20 +28,24 @@ class _MyAppState extends State<MyApp> {
 
   void _toggleTheme() {
     setState(() {
-      _themeMode =
-          _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+      _themeMode = _themeMode == ThemeMode.light
+          ? ThemeMode.dark
+          : ThemeMode.light;
     });
   }
 
   // ---- Cart state ----
   final List<CartItem> _cartItems = [];
+  final Set<String> _favoriteIds = <String>{};
 
   int get _cartItemCount =>
       _cartItems.fold(0, (sum, item) => sum + item.quantity);
 
   void _addToCart(Flower product, int quantity) {
     setState(() {
-      final index = _cartItems.indexWhere((item) => item.product.id == product.id);
+      final index = _cartItems.indexWhere(
+        (item) => item.product.id == product.id,
+      );
       if (index >= 0) {
         _cartItems[index].quantity += quantity;
       } else {
@@ -51,7 +56,9 @@ class _MyAppState extends State<MyApp> {
 
   void _updateCartQuantity(String productId, int newQuantity) {
     setState(() {
-      final index = _cartItems.indexWhere((item) => item.product.id == productId);
+      final index = _cartItems.indexWhere(
+        (item) => item.product.id == productId,
+      );
       if (index < 0) return;
       if (newQuantity <= 0) {
         _cartItems.removeAt(index);
@@ -71,6 +78,14 @@ class _MyAppState extends State<MyApp> {
     setState(() => _cartItems.clear());
   }
 
+  void _toggleFavorite(String productId) {
+    setState(() {
+      if (!_favoriteIds.add(productId)) {
+        _favoriteIds.remove(productId);
+      }
+    });
+  }
+
   /// Navigation 2.0 (go_router) route table:
   ///   /              -> Home (Product Grid)
   ///   /product/:id   -> Product Detail Page
@@ -84,6 +99,8 @@ class _MyAppState extends State<MyApp> {
           onToggleTheme: _toggleTheme,
           cartItemCount: _cartItemCount,
           onCartTap: () => context.push('/cart'),
+          favoriteIds: _favoriteIds,
+          onToggleFavorite: _toggleFavorite,
         ),
       ),
       GoRoute(
@@ -95,6 +112,8 @@ class _MyAppState extends State<MyApp> {
             cartItemCount: _cartItemCount,
             onAddToCart: _addToCart,
             onCartTap: () => context.push('/cart'),
+            isFavorite: _favoriteIds.contains(id),
+            onToggleFavorite: () => _toggleFavorite(id),
           );
         },
       ),
@@ -105,6 +124,16 @@ class _MyAppState extends State<MyApp> {
           onUpdateQuantity: _updateCartQuantity,
           onRemove: _removeFromCart,
           onCheckoutComplete: _clearCart,
+        ),
+      ),
+      GoRoute(
+        path: '/confirmation',
+        builder: (context, state) => OrderConfirmationScreen(
+          total: (state.extra as double?) ?? 0,
+          onBackToHome: () {
+            _clearCart();
+            context.go('/');
+          },
         ),
       ),
     ],

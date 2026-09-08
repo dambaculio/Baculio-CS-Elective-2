@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../models/cart.dart';
 import '../theme/design_theme.dart';
 import '../widgets/product_image.dart';
-import 'order_confirmation.dart';
 
 /// Shows everything currently in the cart before checkout.
 /// Flow: Product Page -> Add to Cart -> Floating Cart -> Order List
@@ -51,10 +51,11 @@ class OrderListScreen extends StatelessWidget {
                         height: 64,
                         child: ProductImage(
                           imageUrl: item.product.imageUrl,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            color: AppColors.lightPink,
-                            child: const Icon(Icons.local_florist_outlined),
-                          ),
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                                color: AppColors.lightPink,
+                                child: const Icon(Icons.local_florist_outlined),
+                              ),
                         ),
                       ),
                     ),
@@ -92,7 +93,10 @@ class OrderListScreen extends StatelessWidget {
                                 item.quantity - 1,
                               ),
                             ),
-                            Text('${item.quantity}', style: textTheme.titleMedium),
+                            Text(
+                              '${item.quantity}',
+                              style: textTheme.titleMedium,
+                            ),
                             IconButton(
                               icon: const Icon(Icons.add_circle_outline),
                               onPressed: () => onUpdateQuantity(
@@ -106,7 +110,9 @@ class OrderListScreen extends StatelessWidget {
                           onPressed: () => onRemove(item.product.id),
                           icon: const Icon(Icons.delete_outline, size: 18),
                           label: const Text('Remove'),
-                          style: TextButton.styleFrom(foregroundColor: Colors.red),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.red,
+                          ),
                         ),
                       ],
                     ),
@@ -128,8 +134,9 @@ class OrderListScreen extends StatelessWidget {
                         Text('Total', style: textTheme.titleMedium),
                         Text(
                           '\u20b1${_total.toStringAsFixed(2)}',
-                          style: textTheme.headlineMedium
-                              ?.copyWith(color: colorScheme.primary),
+                          style: textTheme.headlineMedium?.copyWith(
+                            color: colorScheme.primary,
+                          ),
                         ),
                       ],
                     ),
@@ -138,17 +145,9 @@ class OrderListScreen extends StatelessWidget {
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: () {
-                          final itemsSnapshot = List<CartItem>.from(cartItems);
                           final totalSnapshot = _total;
-                          showOrderConfirmedDialog(
-                            context,
-                            items: itemsSnapshot,
-                            total: totalSnapshot,
-                            onDone: () {
-                              onCheckoutComplete();
-                              Navigator.of(context).pop();
-                            },
-                          );
+                          onCheckoutComplete();
+                          context.push('/confirmation', extra: totalSnapshot);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: colorScheme.primary,
