@@ -7,6 +7,7 @@ import 'pokemon_card.dart';
 ///
 /// Uses a max tile width instead of a fixed column count, so the number of
 /// columns adapts automatically: ~2 on phones, 3–4 on tablets, 5+ on desktop.
+/// Tiles use a portrait ratio (~0.72) like a real trading card.
 class PokemonGrid extends StatelessWidget {
   final List<Pokemon> pokemon;
 
@@ -19,8 +20,8 @@ class PokemonGrid extends StatelessWidget {
         final isCompact = constraints.maxWidth < 600;
 
         return GridView.builder(
-          // Lets pull-to-refresh work even when the grid fits on screen.
-          physics: const AlwaysScrollableScrollPhysics(),
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
           padding: EdgeInsets.fromLTRB(
             isCompact ? 12 : 20,
             8,
@@ -28,10 +29,10 @@ class PokemonGrid extends StatelessWidget {
             24,
           ),
           gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: isCompact ? 200 : 220,
+            maxCrossAxisExtent: isCompact ? 200 : 230,
             mainAxisSpacing: isCompact ? 10 : 16,
             crossAxisSpacing: isCompact ? 10 : 16,
-            childAspectRatio: 0.82,
+            childAspectRatio: 0.72,
           ),
           itemCount: pokemon.length,
           itemBuilder: (context, index) => PokemonCard(

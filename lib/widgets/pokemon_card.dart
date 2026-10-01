@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../models/pokemon.dart';
+import '../theme/pokemon_type_colors.dart';
 
-/// One tile in the grid: image, name and ID.
+/// One tile in the grid, styled like a trading card and colored by the
+/// Pokémon's primary type: type badge + name on top, artwork in a framed
+/// box, and the Pokédex number once in the footer.
 /// Lifts slightly on hover (web/desktop) or press (touch).
 class PokemonCard extends StatefulWidget {
   final Pokemon pokemon;
@@ -16,18 +19,25 @@ class PokemonCard extends StatefulWidget {
 class _PokemonCardState extends State<PokemonCard> {
   bool _highlighted = false;
 
+  static const Color _ink = Color(0xFF222222);
+
   void _setHighlighted(bool value) {
     if (_highlighted != value) setState(() => _highlighted = value);
   }
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
     final pokemon = widget.pokemon;
+    final palette = PokemonTypeColors.paletteOf(pokemon.primaryType);
+    final badgeText = (pokemon.primaryType ?? 'basic').toUpperCase();
+    final secondary = pokemon.secondaryType;
+
+    final typeSemantics = pokemon.types.isEmpty
+        ? ''
+        : ', ${pokemon.types.join(' and ')} type';
 
     return Semantics(
-      label: '${pokemon.displayName}, number ${pokemon.id}',
+      label: '${pokemon.displayName}, number ${pokemon.id}$typeSemantics',
       child: MouseRegion(
         onEnter: (_) => _setHighlighted(true),
         onExit: (_) => _setHighlighted(false),
@@ -39,60 +49,111 @@ class _PokemonCardState extends State<PokemonCard> {
             scale: _highlighted ? 1.04 : 1.0,
             duration: const Duration(milliseconds: 160),
             curve: Curves.easeOut,
-            child: Card(
-              elevation: _highlighted ? 6 : 1,
-              clipBehavior: Clip.antiAlias,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOut,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: palette.border, width: 4),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: palette.gradient,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(
+                      alpha: _highlighted ? 0.35 : 0.2,
+                    ),
+                    blurRadius: _highlighted ? 12 : 5,
+                    offset: Offset(0, _highlighted ? 6 : 2),
+                  ),
+                ],
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Container(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Header: type badge + name
+                  Row(
+                    children: [
+                      Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
+                          horizontal: 5,
+                          vertical: 1,
                         ),
                         decoration: BoxDecoration(
-                          color: colors.primaryContainer,
-                          borderRadius: BorderRadius.circular(999),
+                          color: Colors.white.withValues(alpha: 0.75),
+                          border: Border.all(color: Colors.black54),
+                          borderRadius: BorderRadius.circular(3),
                         ),
                         child: Text(
-                          pokemon.formattedId,
-                          style: text.labelMedium?.copyWith(
-                            color: colors.onPrimaryContainer,
+                          badgeText,
+                          style: const TextStyle(
+                            color: _ink,
+                            fontSize: 8,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
-                    ),
-                    Expanded(
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 6),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: colors.surfaceContainerHighest
-                              .withValues(alpha: 0.6),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          pokemon.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: _ink,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                        padding: const EdgeInsets.all(8),
-                        child: _PokemonImage(url: pokemon.imageUrl),
                       ),
-                    ),
-                    Text(
-                      pokemon.displayName,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: text.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Framed artwork
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: palette.border, width: 2.5),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: palette.art,
+                        ),
                       ),
+                      padding: const EdgeInsets.all(6),
+                      child: _PokemonImage(url: pokemon.imageUrl),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Footer: the ID appears ONLY here; second type (if any)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        pokemon.formattedId,
+                        style: const TextStyle(
+                          color: _ink,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      if (secondary != null)
+                        Text(
+                          Pokemon.typeLabel(secondary),
+                          style: const TextStyle(
+                            color: _ink,
+                            fontSize: 10,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
@@ -111,8 +172,6 @@ class _PokemonImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-
     return Image.network(
       url,
       fit: BoxFit.contain,
@@ -132,10 +191,10 @@ class _PokemonImage extends StatelessWidget {
           ),
         );
       },
-      errorBuilder: (context, error, stackTrace) => Center(
+      errorBuilder: (context, error, stackTrace) => const Center(
         child: Icon(
           Icons.image_not_supported_outlined,
-          color: colors.outline,
+          color: Colors.black45,
           size: 32,
         ),
       ),

@@ -17,11 +17,15 @@ class PokemonServiceException implements Exception {
 /// Handles all API calls to PokéAPI.
 ///
 /// WHY A FUTURE (not a Stream)?
-/// Fetching the list is a single HTTP GET: it produces exactly ONE result
-/// (the list of 30 Pokémon) and then it is finished. "One result -> Future,
+/// Loading the Pokédex produces exactly ONE result (the list of 30 Pokémon,
+/// each with its types) and then it is finished. "One result -> Future,
 /// many results over time -> Stream" (Module 03 decision guide). There is no
-/// continuous data here (no live feed, no WebSocket), so a Stream would add
-/// complexity without any benefit.
+/// continuous data here, so a Stream would add complexity without any benefit.
+///
+/// HOW IT LOADS:
+/// 1. One request for the list (name + url).
+/// 2. 30 independent detail requests for the types, run at the same time
+///    with Future.wait() instead of one after another (Module 02).
 class PokemonService {
   PokemonService({http.Client? client}) : _client = client ?? http.Client();
 
@@ -30,7 +34,7 @@ class PokemonService {
   static const String _baseUrl = 'https://pokeapi.co/api/v2/pokemon';
   static const Duration _timeout = Duration(seconds: 10);
 
-  /// Fetches the first [limit] Pokémon. Defaults to 30 per the activity.
+  /// Fetches the first [limit] Pokémon with their types.
   Future<List<Pokemon>> fetchPokemon({int limit = 30}) async {
     final uri = Uri.parse(_baseUrl).replace(
       queryParameters: {'limit': '$limit', 'offset': '0'},
@@ -57,11 +61,15 @@ class PokemonService {
         throw const FormatException('Expected a "results" list.');
       }
 
-      return results
+      final basics = results
           .whereType<Map<String, dynamic>>()
           .map(Pokemon.fromJson)
           .take(limit)
           .toList();
+
+      // Independent calls -> run concurrently. _withTypes never throws, so one
+      // failed detail request can't reject the whole Future.wait().
+      return await Future.wait(basics.map(_withTypes));
     } on PokemonServiceException {
       rethrow; // already user-friendly
     } on TimeoutException {
@@ -81,6 +89,27 @@ class PokemonService {
     } catch (e) {
       // Fallback for anything else — never swallow errors silently.
       throw PokemonServiceException('Something went wrong: $e');
+    }
+  }
+
+  /// Loads the types of one Pokémon. Types are a nice-to-have, so on ANY
+  /// failure we return the Pokémon without types (the card then uses neutral
+  /// colors) instead of failing the whole list.
+  Future<Pokemon> _withTypes(Pokemon pokemon) async {
+    try {
+      final response = await _client
+          .get(Uri.parse('$_baseUrl/${pokemon.id}'))
+          .timeout(_timeout);
+      if (response.statusCode != 200) return pokemon;
+
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) return pokemon;
+
+      return pokemon.copyWith(
+        types: Pokemon.typesFromDetailJson(decoded['types']),
+      );
+    } catch (_) {
+      return pokemon;
     }
   }
 
