@@ -27,8 +27,12 @@ class _PokedexAppState extends State<PokedexApp> {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => PokemonProvider()..fetchPokemon(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => PokemonProvider()..fetchPokemon(),
+        ),
+      ],
       child: MaterialApp(
         title: 'Pokédex',
         debugShowCheckedModeBanner: false,

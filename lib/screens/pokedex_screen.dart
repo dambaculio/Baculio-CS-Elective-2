@@ -14,35 +14,6 @@ class PokedexScreen extends StatelessWidget {
 
   const PokedexScreen({super.key, this.onThemeModeChanged});
 
-  void _showWhyFuture(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.lightbulb_outline),
-        title: const Text('Why a Future, not a Stream?'),
-        content: const SingleChildScrollView(
-          child: Text(
-            'Loading the Pokédex produces exactly ONE result — the list of '
-            '30 Pokémon with their types — and then it is done.\n\n'
-            'Rule of thumb: one result → Future; many results over time → Stream '
-            '(live chat, sensors, WebSockets).\n\n'
-            'Under the hood the service makes one list request, then 30 '
-            'independent detail requests that run together with Future.wait(). '
-            'The result is still a single Future<List<Pokemon>>, created once '
-            'in initState() and consumed by a FutureBuilder that shows the '
-            'loading, error, empty and data states.',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Got it'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -63,11 +34,6 @@ class PokedexScreen extends StatelessWidget {
                 fit: BoxFit.cover,
                 semanticLabel: 'Pokéball',
               ),
-            ),
-            IconButton(
-              tooltip: 'Why a Future?',
-              icon: const Icon(Icons.info_outline),
-              onPressed: () => _showWhyFuture(context),
             ),
             IconButton(
               tooltip: 'Reload',
