@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/pokemon.dart';
 import '../theme/pokemon_type_colors.dart';
+import '../screens/pokemon_detail_screen.dart';
 
 /// One tile in the grid, styled like a trading card and colored by the
 /// Pokémon's primary type: type badge + name on top, artwork in a framed
@@ -42,6 +43,11 @@ class _PokemonCardState extends State<PokemonCard> {
         onEnter: (_) => _setHighlighted(true),
         onExit: (_) => _setHighlighted(false),
         child: GestureDetector(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => PokemonDetailScreen(pokemonId: pokemon.id),
+            ),
+          ),
           onTapDown: (_) => _setHighlighted(true),
           onTapUp: (_) => _setHighlighted(false),
           onTapCancel: () => _setHighlighted(false),

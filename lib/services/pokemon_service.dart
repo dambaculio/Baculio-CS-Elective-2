@@ -69,7 +69,7 @@ class PokemonService {
 
       // Independent calls -> run concurrently. _withTypes never throws, so one
       // failed detail request can't reject the whole Future.wait().
-      return await Future.wait(basics.map(_withTypes));
+      return await Future.wait(basics.map(_withDetails));
     } on PokemonServiceException {
       rethrow; // already user-friendly
     } on TimeoutException {
@@ -92,10 +92,10 @@ class PokemonService {
     }
   }
 
-  /// Loads the types of one Pokémon. Types are a nice-to-have, so on ANY
+  /// Loads the details of one Pokémon. Details are a nice-to-have, so on ANY
   /// failure we return the Pokémon without types (the card then uses neutral
   /// colors) instead of failing the whole list.
-  Future<Pokemon> _withTypes(Pokemon pokemon) async {
+  Future<Pokemon> _withDetails(Pokemon pokemon) async {
     try {
       final response = await _client
           .get(Uri.parse('$_baseUrl/${pokemon.id}'))
@@ -107,6 +107,13 @@ class PokemonService {
 
       return pokemon.copyWith(
         types: Pokemon.typesFromDetailJson(decoded['types']),
+        height: decoded['height'] is int ? decoded['height'] as int : null,
+        weight: decoded['weight'] is int ? decoded['weight'] as int : null,
+        baseExperience: decoded['base_experience'] is int
+            ? decoded['base_experience'] as int
+            : null,
+        abilities: Pokemon.abilitiesFromDetailJson(decoded['abilities']),
+        stats: Pokemon.statsFromDetailJson(decoded['stats']),
       );
     } catch (_) {
       return pokemon;

@@ -12,12 +12,22 @@ class Pokemon {
 
   /// e.g. ['grass', 'poison']. Empty if the types could not be loaded.
   final List<String> types;
+  final int? height;
+  final int? weight;
+  final int? baseExperience;
+  final List<String> abilities;
+  final List<PokemonStat> stats;
 
   const Pokemon({
     required this.id,
     required this.name,
     required this.imageUrl,
     this.types = const [],
+    this.height,
+    this.weight,
+    this.baseExperience,
+    this.abilities = const [],
+    this.stats = const [],
   });
 
   static const String _artworkBase =
@@ -66,11 +76,41 @@ class Pokemon {
     return result;
   }
 
-  Pokemon copyWith({List<String>? types}) => Pokemon(
+  static List<String> abilitiesFromDetailJson(Object? json) {
+    if (json is! List) return const [];
+    return [
+      for (final entry in json)
+        if (entry is Map && entry['ability'] is Map)
+          if ((entry['ability'] as Map)['name'] is String)
+            (entry['ability'] as Map)['name'] as String,
+    ];
+  }
+
+  static List<PokemonStat> statsFromDetailJson(Object? json) {
+    if (json is! List) return const [];
+    return [
+      for (final entry in json)
+        if (entry is Map) PokemonStat.fromJson(entry),
+    ];
+  }
+
+  Pokemon copyWith({
+    List<String>? types,
+    int? height,
+    int? weight,
+    int? baseExperience,
+    List<String>? abilities,
+    List<PokemonStat>? stats,
+  }) => Pokemon(
         id: id,
         name: name,
         imageUrl: imageUrl,
         types: types ?? this.types,
+        height: height ?? this.height,
+        weight: weight ?? this.weight,
+        baseExperience: baseExperience ?? this.baseExperience,
+        abilities: abilities ?? this.abilities,
+        stats: stats ?? this.stats,
       );
 
   String? get primaryType => types.isEmpty ? null : types.first;
@@ -89,4 +129,26 @@ class Pokemon {
 
   /// 1 -> "#001"
   String get formattedId => '#${id.toString().padLeft(3, '0')}';
+}
+
+class PokemonStat {
+  final String name;
+  final int value;
+
+  const PokemonStat({required this.name, required this.value});
+
+  factory PokemonStat.fromJson(Map<dynamic, dynamic> json) {
+    final stat = json['stat'];
+    final name = stat is Map && stat['name'] is String ? stat['name'] as String : '';
+    final value = json['base_stat'];
+    return PokemonStat(
+      name: name,
+      value: value is int ? value : int.tryParse('$value') ?? 0,
+    );
+  }
+
+  String get displayName => name
+      .split('-')
+      .map((part) => part.isEmpty ? part : part[0].toUpperCase() + part.substring(1))
+      .join(' ');
 }

@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:provider/provider.dart';
 
 import 'package:flutter_application_1/models/pokemon.dart';
+import 'package:flutter_application_1/providers/pokemon_provider.dart';
 import 'package:flutter_application_1/screens/pokedex_screen.dart';
 import 'package:flutter_application_1/services/pokemon_service.dart';
 
@@ -21,7 +23,11 @@ String _listBody(int count) => jsonEncode({
     });
 
 Widget _app(http.Client client) => MaterialApp(
-      home: PokedexScreen(service: PokemonService(client: client)),
+      home: ChangeNotifierProvider(
+        create: (_) => PokemonProvider(service: PokemonService(client: client))
+          ..fetchPokemon(),
+        child: const PokedexScreen(),
+      ),
     );
 
 void main() {
@@ -47,15 +53,15 @@ void main() {
 
   group('PokemonService', () {
     test('requests limit=30 and returns 30 Pokémon', () async {
-      late Uri requested;
+      late Uri listRequest;
       final client = MockClient((request) async {
-        requested = request.url;
+        if (request.url.path == '/api/v2/pokemon') listRequest = request.url;
         return http.Response(_listBody(30), 200);
       });
 
       final result = await PokemonService(client: client).fetchPokemon();
 
-      expect(requested.queryParameters['limit'], '30');
+      expect(listRequest.queryParameters['limit'], '30');
       expect(result, hasLength(30));
       expect(result.first.name, 'bulbasaur');
     });

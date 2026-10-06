@@ -120,26 +120,30 @@ class PokedexHeader extends StatelessWidget {
     return Container(
       width: double.infinity,
       color: AppTheme.pokedexRed,
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Semantics(
-            label: 'PokéDex',
-            image: true,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Image.asset(
-                  'assets/images/PokeDex.png',
-                  height: 120,
-                  fit: BoxFit.contain,
-                  semanticLabel: 'PokéDex',
-                ),
-              ],
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+      child: SizedBox(
+        height: 78,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 430),
+            child: ColorFiltered(
+              // The supplied PNG has a black matte. Make dark pixels transparent
+              // so the original PokéDex artwork sits cleanly on the red header.
+              colorFilter: const ColorFilter.matrix([
+                1, 0, 0, 0, 0,
+                0, 1, 0, 0, 0,
+                0, 0, 1, 0, 0,
+                0.333, 0.333, 0.333, 0, 0,
+              ]),
+              child: Image.asset(
+                'assets/images/PokeDex.png',
+                fit: BoxFit.contain,
+                alignment: Alignment.center,
+                semanticLabel: 'PokéDex',
+              ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
