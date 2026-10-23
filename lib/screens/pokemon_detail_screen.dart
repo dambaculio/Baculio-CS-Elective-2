@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/pokemon.dart';
-import '../providers/pokemon_provider.dart';
+import '../providers/nickname_provider.dart';
+import '../providers/pokemon_list_provider.dart';
 import '../theme/pokemon_type_colors.dart';
+import '../utils/pokemon_labels.dart';
+import '../widgets/nickname_editor.dart';
+import '../widgets/pokemon_card_parts.dart';
 
-class PokemonDetailScreen extends StatelessWidget {
+class PokemonDetailScreen extends ConsumerWidget {
   const PokemonDetailScreen({super.key, required this.pokemonId});
 
   final int pokemonId;
 
   @override
-  Widget build(BuildContext context) {
-    final pokemon = context.select<PokemonProvider, Pokemon?>(
-      (provider) => provider.findById(pokemonId),
-    );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pokemon = ref.watch(pokemonByIdProvider(pokemonId));
 
     if (pokemon == null) {
       return const Scaffold(
@@ -23,73 +25,81 @@ class PokemonDetailScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text(pokemon.displayName)),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 760),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _HeroSection(pokemon: pokemon),
-                const SizedBox(height: 20),
+      appBar: AppBar(title: const Text('Card details')),
+      body: _DetailBody(pokemon: pokemon),
+    );
+  }
+}
+
+/// Scrollable body of the detail page: the card, the nickname editor and the
+/// extra Pokédex data.
+class _DetailBody extends StatelessWidget {
+  const _DetailBody({required this.pokemon});
+
+  final Pokemon pokemon;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _HeroSection(pokemon: pokemon),
+              const SizedBox(height: 16),
+              _InfoSection(
+                title: 'Nickname',
+                icon: Icons.edit_outlined,
+                child: NicknameEditor(pokemon: pokemon),
+              ),
+              const SizedBox(height: 16),
+              _InfoSection(
+                title: 'Pokédex data',
+                icon: Icons.straighten_outlined,
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _InfoTile(label: 'Height', value: pokemon.heightLabel),
+                    _InfoTile(label: 'Weight', value: pokemon.weightLabel),
+                    _InfoTile(
+                      label: 'Base EXP',
+                      value: pokemon.baseExperience?.toString() ?? '—',
+                    ),
+                  ],
+                ),
+              ),
+              if (pokemon.abilities.isNotEmpty) ...[
+                const SizedBox(height: 16),
                 _InfoSection(
-                  title: 'Pokédex data',
-                  icon: Icons.straighten_outlined,
+                  title: 'Abilities',
+                  icon: Icons.auto_awesome_outlined,
                   child: Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      _InfoTile(
-                        label: 'Height',
-                        value: pokemon.height == null
-                            ? 'Unknown'
-                            : '${(pokemon.height! / 10).toStringAsFixed(1)} m',
-                      ),
-                      _InfoTile(
-                        label: 'Weight',
-                        value: pokemon.weight == null
-                            ? 'Unknown'
-                            : '${(pokemon.weight! / 10).toStringAsFixed(1)} kg',
-                      ),
-                      _InfoTile(
-                        label: 'Base EXP',
-                        value: pokemon.baseExperience?.toString() ?? 'Unknown',
-                      ),
+                      for (final ability in pokemon.abilities)
+                        Chip(label: Text(Pokemon.typeLabel(ability))),
                     ],
                   ),
                 ),
-                if (pokemon.abilities.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  _InfoSection(
-                    title: 'Abilities',
-                    icon: Icons.auto_awesome_outlined,
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: pokemon.abilities
-                          .map((ability) => Chip(
-                                label: Text(Pokemon.typeLabel(ability)),
-                              ))
-                          .toList(),
-                    ),
-                  ),
-                ],
-                if (pokemon.stats.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  _InfoSection(
-                    title: 'Base stats',
-                    icon: Icons.insights_outlined,
-                    child: Column(
-                      children: pokemon.stats
-                          .map((stat) => _StatRow(stat: stat))
-                          .toList(),
-                    ),
-                  ),
-                ],
               ],
-            ),
+              if (pokemon.stats.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _InfoSection(
+                  title: 'Base stats',
+                  icon: Icons.insights_outlined,
+                  child: Column(
+                    children: [
+                      for (final stat in pokemon.stats) _StatRow(stat: stat),
+                    ],
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),
@@ -97,52 +107,45 @@ class PokemonDetailScreen extends StatelessWidget {
   }
 }
 
-class _HeroSection extends StatelessWidget {
+/// Same card language as the grid: nickname as the title, photo with type
+/// badge and heart, original name in the details below the photo.
+class _HeroSection extends ConsumerWidget {
   const _HeroSection({required this.pokemon});
 
   final Pokemon pokemon;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final nickname = ref.watch(nicknamesProvider.select((n) => n[pokemon.id]));
     final palette = PokemonTypeColors.paletteOf(pokemon.primaryType);
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(colors: palette.gradient),
-        border: Border.all(color: palette.border, width: 2),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: palette.gradient,
+        ),
+        border: Border.all(color: palette.border, width: 3),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Image.network(
-            pokemon.imageUrl,
-            height: 260,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) => const Icon(
-              Icons.image_not_supported_outlined,
-              size: 96,
-            ),
-          ),
           Text(
-            pokemon.displayName,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            nickname ?? pokemon.displayName,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: pokemonInk,
                   fontWeight: FontWeight.w800,
                 ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            pokemon.formattedId,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          if (pokemon.types.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              children: pokemon.types
-                  .map((type) => Chip(label: Text(Pokemon.typeLabel(type))))
-                  .toList(),
-            ),
-          ],
+          const SizedBox(height: 12),
+          PokemonArtFrame(pokemon: pokemon, height: 280, heartSize: 40),
+          const SizedBox(height: 12),
+          PokemonDetailsStrip(pokemon: pokemon, compact: false),
         ],
       ),
     );

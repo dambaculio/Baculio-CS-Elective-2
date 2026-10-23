@@ -1,23 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../providers/pokemon_provider.dart';
+import '../providers/filter_provider.dart';
+import '../providers/pokemon_list_provider.dart';
+import '../widgets/favorites_panel.dart';
 import '../widgets/pokedex_logo.dart';
 import '../widgets/pokemon_grid.dart';
 import '../widgets/state_views.dart';
 import '../widgets/theme_toggle.dart';
 import '../widgets/type_filter_bar.dart';
 
-class PokedexScreen extends StatelessWidget {
+class PokedexScreen extends ConsumerWidget {
   /// Called when the user taps the light/dark toggle.
   final ValueChanged<ThemeMode>? onThemeModeChanged;
 
   const PokedexScreen({super.key, this.onThemeModeChanged});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final provider = context.watch<PokemonProvider>();
+    final list = ref.watch(pokemonListProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -37,7 +39,7 @@ class PokedexScreen extends StatelessWidget {
             ),
             IconButton(
               tooltip: 'Reload',
-              icon: provider.isRefreshing
+              icon: list.isRefreshing
                   ? const SizedBox(
                       width: 20,
                       height: 20,
@@ -47,13 +49,15 @@ class PokedexScreen extends StatelessWidget {
                       ),
                     )
                   : const Icon(Icons.refresh),
-              onPressed: provider.isRefreshing
+              // Shows the loading screen and re-calls the SAME fetch() method.
+              onPressed: list.isLoading
                   ? null
-                  : () => context.read<PokemonProvider>().fetchPokemon(),
+                  : () => ref.read(reloadScreenProvider.notifier).reload(),
             ),
           ],
         ),
         actions: [
+          const FavoritesToggleButton(),
           if (onThemeModeChanged != null)
             ThemeToggle(
               isDark: isDark,
@@ -65,130 +69,207 @@ class PokedexScreen extends StatelessWidget {
         ],
       ),
       body: SafeArea(
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1200),
-            child: const _PokedexContent(),
-          ),
+        child: Column(
+          children: [
+            // Fixed at the top: it never scrolls and the panel opens BELOW it.
+            const PokedexHeader(),
+            const FavoritesPanel(),
+            // Only this area scrolls.
+            Expanded(
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: const _PokedexContent(),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _PokedexContent extends StatelessWidget {
+class _PokedexContent extends ConsumerWidget {
   const _PokedexContent();
 
   @override
-  Widget build(BuildContext context) {
-    final provider = context.watch<PokemonProvider>();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final list = ref.watch(pokemonListProvider);
+    final pokemon = list.value;
 
-    switch (provider.state) {
-      case PokemonLoadState.idle:
-      case PokemonLoadState.loading:
-        return const LoadingView();
-      case PokemonLoadState.error:
-        return ErrorView(
-          message: provider.errorMessage ?? 'Unable to load Pokémon.',
-          onRetry: () => context.read<PokemonProvider>().fetchPokemon(),
+    // Reload button tapped -> full loading screen until the fetch finishes.
+    if (ref.watch(reloadScreenProvider)) return const LoadingView();
+
+    // Data (including the previous data while refreshing) -> show it.
+    if (pokemon != null) {
+      if (pokemon.isEmpty) {
+        return EmptyView(
+          action: FilledButton.icon(
+            onPressed: () => ref.read(reloadScreenProvider.notifier).reload(),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Reload'),
+          ),
         );
-      case PokemonLoadState.success:
-        if (provider.pokemon.isEmpty) {
-          return EmptyView(
-            action: FilledButton.icon(
-              onPressed: () => context.read<PokemonProvider>().fetchPokemon(),
-              icon: const Icon(Icons.refresh),
-              label: const Text('Reload'),
-            ),
-          );
-        }
-        return const _LoadedPokedex();
+      }
+      return const _LoadedPokedex();
     }
+
+    // No data and not loading -> the request failed.
+    if (list.hasError && !list.isLoading) {
+      return ErrorView(
+        message: '${list.error}',
+        onRetry: () => ref.read(pokemonListProvider.notifier).fetch(),
+      );
+    }
+
+    return const LoadingView();
   }
 }
 
-class _LoadedPokedex extends StatelessWidget {
+class _LoadedPokedex extends ConsumerWidget {
   const _LoadedPokedex();
 
-  Future<void> _refresh(BuildContext context) async {
-    await context.read<PokemonProvider>().fetchPokemon();
-  }
-
   @override
-  Widget build(BuildContext context) {
-    final provider = context.watch<PokemonProvider>();
-    final all = provider.pokemon;
-    final visible = provider.visiblePokemon;
-    final isFiltering =
-        provider.query.isNotEmpty || provider.selectedType != null;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final total =
+        ref.watch(pokemonListProvider.select((l) => l.value?.length ?? 0));
+    final visible = ref.watch(visiblePokemonProvider);
+    final types = ref.watch(availableTypesProvider);
+    final filter = ref.watch(pokemonFilterProvider);
+    final filterNotifier = ref.read(pokemonFilterProvider.notifier);
     final text = Theme.of(context).textTheme;
     final colors = Theme.of(context).colorScheme;
 
     return RefreshIndicator(
-      onRefresh: () => _refresh(context),
-      child: SingleChildScrollView(
+      // Pull-to-refresh also just re-calls fetch().
+      onRefresh: () => ref.read(pokemonListProvider.notifier).fetch(),
+      child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const PokedexHeader(),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: TextField(
-                onChanged: context.read<PokemonProvider>().setQuery,
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  hintText: 'Search by name or number',
-                  prefixIcon: const Icon(Icons.search),
-                    suffixIcon: provider.query.isEmpty
-                      ? null
-                      : IconButton(
-                          tooltip: 'Clear',
-                          icon: const Icon(Icons.close),
-                        onPressed: () =>
-                          context.read<PokemonProvider>().setQuery(''),
+        slivers: [
+          SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const _SearchField(),
+                if (types.isNotEmpty)
+                  TypeFilterBar(
+                    types: types,
+                    selected: filter.type,
+                    onSelected: filterNotifier.setType,
+                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 12, 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          !filter.isActive
+                              ? 'Showing $total Pokémon'
+                              : 'Showing ${visible.length} of $total Pokémon',
+                          style: text.labelLarge?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
                         ),
-                  filled: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(999),
-                    borderSide: BorderSide.none,
+                      ),
+                      if (filter.type != null)
+                        TextButton.icon(
+                          onPressed: filterNotifier.clearType,
+                          icon: const Icon(
+                            Icons.filter_alt_off_outlined,
+                            size: 18,
+                          ),
+                          label: const Text('Clear filter'),
+                        ),
+                    ],
                   ),
                 ),
-              ),
+              ],
             ),
-            if (provider.availableTypes.isNotEmpty)
-              TypeFilterBar(
-                types: provider.availableTypes,
-                selected: provider.selectedType,
-                onSelected:
-                    context.read<PokemonProvider>().setSelectedType,
-              ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-              child: Text(
-                !isFiltering
-                    ? 'Showing ${all.length} Pokémon'
-                    : 'Showing ${visible.length} of ${all.length} Pokémon',
-                style: text.labelLarge?.copyWith(
-                  color: colors.onSurfaceVariant,
+          ),
+          if (visible.isEmpty)
+            SliverToBoxAdapter(
+              child: EmptyView(
+                title: 'No matches',
+                subtitle: filter.query.isEmpty
+                    ? 'No Pokémon match this type.'
+                    : 'No Pokémon matches "${filter.query}".',
+                action: OutlinedButton(
+                  onPressed: filterNotifier.clearAll,
+                  child: const Text('Clear filters'),
                 ),
               ),
-            ),
-            visible.isEmpty
-                ? EmptyView(
-                    title: 'No matches',
-                    subtitle: provider.query.isEmpty
-                        ? 'No Pokémon match this type.'
-                        : 'No Pokémon matches "${provider.query}".',
-                    action: OutlinedButton(
-                      onPressed:
-                          context.read<PokemonProvider>().clearFilters,
-                      child: const Text('Clear filters'),
-                    ),
-                  )
-                : PokemonGrid(pokemon: visible),
-          ],
+            )
+          else
+            PokemonSliverGrid(pokemon: visible),
+        ],
+      ),
+    );
+  }
+}
+
+/// Search box. Owns its TextEditingController (disposed below) and stays in
+/// sync with the filter state, so "Clear filters" also empties the text.
+class _SearchField extends ConsumerStatefulWidget {
+  const _SearchField();
+
+  @override
+  ConsumerState<_SearchField> createState() => _SearchFieldState();
+}
+
+class _SearchFieldState extends ConsumerState<_SearchField> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller =
+        TextEditingController(text: ref.read(pokemonFilterProvider).query);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final query = ref.watch(pokemonFilterProvider.select((f) => f.query));
+    final notifier = ref.read(pokemonFilterProvider.notifier);
+
+    ref.listen<String>(
+      pokemonFilterProvider.select((f) => f.query),
+      (_, next) {
+        if (_controller.text != next) _controller.text = next;
+      },
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      child: TextField(
+        controller: _controller,
+        onChanged: notifier.setQuery,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: 'Search by name, nickname or number',
+          prefixIcon: const Icon(Icons.search),
+          suffixIcon: query.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: 'Clear',
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    _controller.clear();
+                    notifier.setQuery('');
+                  },
+                ),
+          filled: true,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(999),
+            borderSide: BorderSide.none,
+          ),
         ),
       ),
     );
