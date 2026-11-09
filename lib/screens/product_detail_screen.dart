@@ -1,25 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/models/flower.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../providers/cart_provider.dart';
 import '../providers/product_provider.dart';
 import '../theme/design_theme.dart';
 import '../widgets/product_image.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final String productId;
-  final int? cartItemCount;
-  final void Function(Flower, int)? onAddToCart;
-  final VoidCallback? onCartTap;
   final bool isFavorite;
   final VoidCallback? onToggleFavorite;
 
   const ProductDetailScreen({
     super.key,
     required this.productId,
-    this.cartItemCount,
-    this.onAddToCart,
-    this.onCartTap,
     this.isFavorite = false,
     this.onToggleFavorite,
   });
@@ -30,7 +26,6 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _quantity = 1;
-  late int _displayedCartItemCount = widget.cartItemCount ?? 0;
   String? _selectedColor;
   late bool _isFavorite = widget.isFavorite;
 
@@ -39,9 +34,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isFavorite != widget.isFavorite) {
       _isFavorite = widget.isFavorite;
-    }
-    if (oldWidget.cartItemCount != widget.cartItemCount) {
-      _displayedCartItemCount = widget.cartItemCount ?? 0;
     }
   }
 
@@ -127,7 +119,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
     try {
+      final cart = context.read<CartProvider>();
       await context.read<ProductProvider>().deleteProduct(product.id);
+      cart.remove(product.id); // a deleted product can't stay in the cart
       navigator.pop(); // back to the shop
       messenger.showSnackBar(
         SnackBar(
@@ -209,9 +203,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         top: 12,
                         right: 64,
                         child: _CartActionButton(
-                          itemCount: _displayedCartItemCount,
+                          itemCount: context.watch<CartProvider>().itemCount,
                           tooltip: 'Cart',
-                          onPressed: widget.onCartTap,
+                          onPressed: () => context.push('/cart'),
                         ),
                       ),
                       Positioned(
@@ -372,14 +366,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   Expanded(
                     child: FilledButton.icon(
                       onPressed:
-                          widget.onAddToCart == null ||
-                              (supportsColorChoice && _selectedColor == null)
+                          supportsColorChoice && _selectedColor == null
                           ? null
                           : () {
-                              setState(() {
-                                _displayedCartItemCount += _quantity;
-                              });
-                              widget.onAddToCart!(product, _quantity);
+                              context.read<CartProvider>().add(
+                                product,
+                                _quantity,
+                              );
                               ScaffoldMessenger.of(context)
                                 ..hideCurrentSnackBar()
                                 ..showSnackBar(
@@ -426,7 +419,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 );
                             },
                       icon: const Icon(Icons.shopping_cart_outlined),
-                      label: const Text('Add to Cart'),
+                      // Tell the customer why the button is disabled.
+                      label: Text(
+                        supportsColorChoice && _selectedColor == null
+                            ? 'Choose a color'
+                            : 'Add to Cart',
+                      ),
                       style: FilledButton.styleFrom(
                         backgroundColor: colorScheme.primary,
                         foregroundColor: Colors.white,

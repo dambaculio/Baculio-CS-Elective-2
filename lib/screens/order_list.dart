@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../models/cart.dart';
+import '../providers/cart_provider.dart';
 import '../theme/design_theme.dart';
 import '../widgets/product_image.dart';
 import 'order_confirmation.dart';
@@ -10,25 +12,16 @@ import 'order_confirmation.dart';
 /// Flow: Product Page -> Add to Cart -> Floating Cart -> Order List
 /// (this page) -> Order Confirmation.
 class OrderListScreen extends StatelessWidget {
-  final List<CartItem> cartItems;
-  final void Function(String productId, int newQuantity) onUpdateQuantity;
-  final void Function(String productId) onRemove;
-  final VoidCallback onCheckoutComplete;
-
-  const OrderListScreen({
-    super.key,
-    required this.cartItems,
-    required this.onUpdateQuantity,
-    required this.onRemove,
-    required this.onCheckoutComplete,
-  });
-
-  double get _total => cartItems.fold(0, (sum, item) => sum + item.subtotal);
+  const OrderListScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
+
+    // watch -> this page rebuilds whenever the cart changes.
+    final cart = context.watch<CartProvider>();
+    final cartItems = cart.items;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Order List')),
@@ -58,7 +51,7 @@ class OrderListScreen extends StatelessWidget {
                       size: 28,
                     ),
                   ),
-                  onDismissed: (_) => onRemove(item.product.id),
+                  onDismissed: (_) => cart.remove(item.product.id),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -111,7 +104,7 @@ class OrderListScreen extends StatelessWidget {
                             children: [
                               IconButton(
                                 icon: const Icon(Icons.remove_circle_outline),
-                                onPressed: () => onUpdateQuantity(
+                                onPressed: () => cart.updateQuantity(
                                   item.product.id,
                                   item.quantity - 1,
                                 ),
@@ -122,7 +115,7 @@ class OrderListScreen extends StatelessWidget {
                               ),
                               IconButton(
                                 icon: const Icon(Icons.add_circle_outline),
-                                onPressed: () => onUpdateQuantity(
+                                onPressed: () => cart.updateQuantity(
                                   item.product.id,
                                   item.quantity + 1,
                                 ),
@@ -131,7 +124,7 @@ class OrderListScreen extends StatelessWidget {
                                 icon: const Icon(Icons.delete_outline),
                                 tooltip: 'Remove item',
                                 color: Colors.red,
-                                onPressed: () => onRemove(item.product.id),
+                                onPressed: () => cart.remove(item.product.id),
                               ),
                             ],
                           ),
@@ -155,7 +148,7 @@ class OrderListScreen extends StatelessWidget {
                       children: [
                         Text('Total', style: textTheme.titleMedium),
                         Text(
-                          '\u20b1${_total.toStringAsFixed(2)}',
+                          '\u20b1${cart.total.toStringAsFixed(2)}',
                           style: textTheme.headlineMedium?.copyWith(
                             color: colorScheme.primary,
                           ),
@@ -167,9 +160,18 @@ class OrderListScreen extends StatelessWidget {
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: () {
-                          final totalSnapshot = _total;
-                          final itemsSnapshot = List<CartItem>.from(cartItems);
-                          onCheckoutComplete();
+                          final totalSnapshot = cart.total;
+                          // Copy the items (not just the list) so clearing
+                          // the cart doesn't affect the confirmation page.
+                          final itemsSnapshot = cartItems
+                              .map(
+                                (i) => CartItem(
+                                  product: i.product,
+                                  quantity: i.quantity,
+                                ),
+                              )
+                              .toList();
+                          cart.clear();
                           context.push(
                             '/confirmation',
                             extra: OrderSummary(

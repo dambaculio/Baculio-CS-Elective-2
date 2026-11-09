@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/carousel_data.dart';
+import '../providers/cart_provider.dart';
 import '../providers/product_provider.dart';
 import '../theme/design_theme.dart';
 import '../utils/responsive.dart';
@@ -14,8 +15,6 @@ import '../widgets/image_carousel.dart';
 class HomeScreen extends StatefulWidget {
   final ThemeMode themeMode;
   final VoidCallback onToggleTheme;
-  final int cartItemCount;
-  final VoidCallback onCartTap;
   final Set<String> favoriteIds;
   final void Function(String productId) onToggleFavorite;
 
@@ -23,8 +22,6 @@ class HomeScreen extends StatefulWidget {
     super.key,
     required this.themeMode,
     required this.onToggleTheme,
-    required this.cartItemCount,
-    required this.onCartTap,
     required this.favoriteIds,
     required this.onToggleFavorite,
   });
@@ -128,8 +125,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       floatingActionButton: FloatingCartButton(
-        itemCount: widget.cartItemCount,
-        onTap: widget.onCartTap,
+        itemCount: context.watch<CartProvider>().itemCount,
+        onTap: () => context.push('/cart'),
       ),
       body: SafeArea(
         child: CustomScrollView(
