@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../data/carousel_data.dart';
-import '../data/flower_data.dart';
-import '../models/flower.dart';
+import '../providers/product_provider.dart';
 import '../theme/design_theme.dart';
 import '../utils/responsive.dart';
 import '../widgets/flower_card.dart';
 import '../widgets/floating_cart_button.dart';
 import '../widgets/image_carousel.dart';
-
-enum SortOption { defaultOrder, priceLowHigh, priceHighLow }
 
 class HomeScreen extends StatefulWidget {
   final ThemeMode themeMode;
@@ -45,35 +43,40 @@ class _HomeScreenState extends State<HomeScreen> {
     'Favorites',
   ];
 
-  String _searchQuery = '';
-  String _selectedCategory = 'All';
-  SortOption _sortOption = SortOption.defaultOrder;
+  /// Key on the results heading so we can scroll back to it when the
+  /// page changes.
+  final GlobalKey _resultsKey = GlobalKey();
 
-  List<Flower> get _visibleFlowers {
-    final filtered = flowerList.where((f) {
-      final matchesSearch = f.name.toLowerCase().contains(
-        _searchQuery.toLowerCase(),
+  /// Slider position while the customer is still dragging. We only query
+  /// Supabase when they let go (onChangeEnd), not on every tick.
+  RangeValues? _draftPrice;
+
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController(
+      text: context.read<ProductProvider>().search,
+    );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _goToPage(ProductProvider products, int page) {
+    products.goToPage(page);
+    final target = _resultsKey.currentContext;
+    if (target != null) {
+      Scrollable.ensureVisible(
+        target,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
       );
-      final matchesFavorites =
-          _selectedCategory != 'Favorites' || widget.favoriteIds.contains(f.id);
-      final matchesCategory =
-          _selectedCategory == 'All' ||
-          _selectedCategory == 'Favorites' ||
-          f.category == _selectedCategory;
-      return matchesSearch && matchesCategory && matchesFavorites;
-    }).toList();
-
-    switch (_sortOption) {
-      case SortOption.defaultOrder:
-        break;
-      case SortOption.priceLowHigh:
-        filtered.sort((a, b) => a.price.compareTo(b.price));
-        break;
-      case SortOption.priceHighLow:
-        filtered.sort((a, b) => b.price.compareTo(a.price));
-        break;
     }
-    return filtered;
   }
 
   @override
@@ -81,7 +84,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     final width = MediaQuery.sizeOf(context).width;
     final crossAxisCount = gridColumnsFor(deviceTypeOf(width));
-    final flowers = _visibleFlowers;
+    final products = context.watch<ProductProvider>();
+    final flowers = products.items;
 
     return Scaffold(
       appBar: AppBar(
@@ -140,8 +144,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Expanded(
                           child: TextField(
-                            onChanged: (value) =>
-                                setState(() => _searchQuery = value),
+                            controller: _searchController,
+                            onChanged: products.setSearch,
                             style: const TextStyle(color: AppColors.textColor),
                             cursorColor: AppColors.textColor,
                             decoration: InputDecoration(
@@ -167,9 +171,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 10),
                         PopupMenuButton<SortOption>(
                           tooltip: 'Sort',
-                          initialValue: _sortOption,
-                          onSelected: (value) =>
-                              setState(() => _sortOption = value),
+                          initialValue: products.sort,
+                          onSelected: products.setSort,
                           itemBuilder: (context) => const [
                             PopupMenuItem(
                               value: SortOption.defaultOrder,
@@ -204,7 +207,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(width: 8),
                         itemBuilder: (context, index) {
                           final category = _categories[index];
-                          final isSelected = category == _selectedCategory;
+                          final isSelected = category == products.category;
                           return ChoiceChip(
                             label: Text(category),
                             selected: isSelected,
@@ -217,25 +220,87 @@ class _HomeScreenState extends State<HomeScreen> {
                               fontWeight: FontWeight.w600,
                             ),
                             shape: const StadiumBorder(),
-                            onSelected: (_) =>
-                                setState(() => _selectedCategory = category),
+                            onSelected: (_) => products.setCategory(category),
                           );
                         },
                       ),
                     ),
+                    if (products.hasPriceData) ...[
+                      const SizedBox(height: 8),
+                      _PriceFilter(
+                        bounds: products.priceBounds,
+                        values: _draftPrice ?? products.priceRange,
+                        isFiltered: products.isPriceFiltered,
+                        onChanged: (v) => setState(() => _draftPrice = v),
+                        onChangeEnd: (v) {
+                          setState(() => _draftPrice = null);
+                          products.setPriceRange(
+                            RangeValues(
+                              v.start.roundToDouble(),
+                              v.end.roundToDouble(),
+                            ),
+                          );
+                        },
+                        onReset: () {
+                          setState(() => _draftPrice = null);
+                          products.resetPriceRange();
+                        },
+                      ),
+                    ],
                     const SizedBox(height: 14),
-                    Text(
-                      _selectedCategory == 'All'
-                          ? 'All Flowers'
-                          : _selectedCategory,
-                      style: Theme.of(context).textTheme.headlineMedium,
+                    Row(
+                      key: _resultsKey,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            products.category == 'All'
+                                ? 'All Flowers'
+                                : products.category,
+                            style: Theme.of(context).textTheme.headlineMedium,
+                          ),
+                        ),
+                        if (products.totalCount > 0)
+                          Text(
+                            '${products.firstItemNumber}–'
+                            '${products.lastItemNumber} of '
+                            '${products.totalCount}',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
+                    // Thin bar while a page/filter query is running.
+                    SizedBox(
+                      height: 4,
+                      child: products.isLoading && flowers.isNotEmpty
+                          ? LinearProgressIndicator(
+                              color: colorScheme.primary,
+                              backgroundColor: AppColors.lightPink,
+                            )
+                          : null,
+                    ),
+                    const SizedBox(height: 8),
                   ],
                 ),
               ),
             ),
-            if (flowers.isEmpty)
+            if (products.state == ProductLoadState.error && flowers.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _ErrorView(
+                  message: products.errorMessage ?? 'Something went wrong.',
+                  onRetry: products.refresh,
+                ),
+              )
+            else if (flowers.isEmpty &&
+                (products.isLoading ||
+                    products.state == ProductLoadState.idle))
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (flowers.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(
@@ -245,30 +310,250 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               )
-            else
+            else ...[
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                sliver: SliverGrid(
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    final flower = flowers[index];
-                    return FlowerCard(
-                      flower: flower,
-                      onTap: () => context.push('/product/${flower.id}'),
-                      isFavorite: widget.favoriteIds.contains(flower.id),
-                      onToggleFavorite: () {
-                        widget.onToggleFavorite(flower.id);
-                        setState(() {});
-                      },
-                    );
-                  }, childCount: flowers.length),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    mainAxisSpacing: 14,
-                    crossAxisSpacing: 14,
-                    childAspectRatio: 0.7,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                sliver: SliverOpacity(
+                  opacity: products.isLoading ? 0.5 : 1,
+                  sliver: SliverGrid(
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final flower = flowers[index];
+                      return FlowerCard(
+                        flower: flower,
+                        onTap: () => context.push('/product/${flower.id}'),
+                        isFavorite: widget.favoriteIds.contains(flower.id),
+                        onToggleFavorite: () {
+                          widget.onToggleFavorite(flower.id);
+                          setState(() {});
+                        },
+                      );
+                    }, childCount: flowers.length),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      mainAxisSpacing: 14,
+                      crossAxisSpacing: 14,
+                      childAspectRatio: 0.7,
+                    ),
                   ),
                 ),
               ),
+              SliverPadding(
+                // Extra bottom space so the floating cart button never
+                // covers the page controls.
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
+                sliver: SliverToBoxAdapter(
+                  child: _PaginationBar(
+                    page: products.page,
+                    totalPages: products.totalPages,
+                    enabled: !products.isLoading,
+                    onPageSelected: (p) => _goToPage(products, p),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Price range slider. Shows the selected range and lets the customer
+/// reset it back to "all prices".
+class _PriceFilter extends StatelessWidget {
+  final RangeValues bounds;
+  final RangeValues values;
+  final bool isFiltered;
+  final ValueChanged<RangeValues> onChanged;
+  final ValueChanged<RangeValues> onChangeEnd;
+  final VoidCallback onReset;
+
+  const _PriceFilter({
+    required this.bounds,
+    required this.values,
+    required this.isFiltered,
+    required this.onChanged,
+    required this.onChangeEnd,
+    required this.onReset,
+  });
+
+  static String _peso(double v) => '\u20b1${v.round()}';
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    // ~₱10 steps; at least 1 division so the value labels show.
+    final divisions = ((bounds.end - bounds.start) / 10).round().clamp(1, 1000);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 8, 4),
+      decoration: BoxDecoration(
+        color: AppColors.lightPink,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.payments_outlined, color: AppColors.textColor),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Price: ${_peso(values.start)} – ${_peso(values.end)}',
+                  style: textTheme.titleMedium?.copyWith(
+                    color: AppColors.textColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (isFiltered)
+                TextButton(
+                  onPressed: onReset,
+                  child: Text(
+                    'Reset',
+                    style: TextStyle(color: colorScheme.primary),
+                  ),
+                ),
+            ],
+          ),
+          RangeSlider(
+            min: bounds.start,
+            max: bounds.end,
+            divisions: divisions,
+            values: RangeValues(
+              values.start.clamp(bounds.start, bounds.end).toDouble(),
+              values.end.clamp(bounds.start, bounds.end).toDouble(),
+            ),
+            labels: RangeLabels(_peso(values.start), _peso(values.end)),
+            activeColor: colorScheme.primary,
+            inactiveColor: AppColors.pink,
+            onChanged: onChanged,
+            onChangeEnd: onChangeEnd,
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 16, 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(_peso(bounds.start), style: textTheme.bodySmall),
+                Text(_peso(bounds.end), style: textTheme.bodySmall),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Prev / numbered pages / Next. Shows at most 5 page numbers around
+/// the current page.
+class _PaginationBar extends StatelessWidget {
+  final int page; // zero-based
+  final int totalPages;
+  final bool enabled;
+  final ValueChanged<int> onPageSelected;
+
+  const _PaginationBar({
+    required this.page,
+    required this.totalPages,
+    required this.enabled,
+    required this.onPageSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (totalPages <= 1) return const SizedBox.shrink();
+
+    final colorScheme = Theme.of(context).colorScheme;
+    const window = 5;
+    var first = (page - window ~/ 2).clamp(0, totalPages - 1);
+    final last = (first + window - 1).clamp(0, totalPages - 1);
+    first = (last - window + 1).clamp(0, totalPages - 1);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          IconButton(
+            tooltip: 'Previous page',
+            onPressed: enabled && page > 0
+                ? () => onPageSelected(page - 1)
+                : null,
+            icon: const Icon(Icons.chevron_left),
+          ),
+          for (var i = first; i <= last; i++)
+            SizedBox(
+              width: 40,
+              height: 40,
+              child: i == page
+                  ? FilledButton(
+                      onPressed: null,
+                      style: FilledButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        shape: const CircleBorder(),
+                        disabledBackgroundColor: colorScheme.primary,
+                        disabledForegroundColor: Colors.white,
+                      ),
+                      child: Text('${i + 1}'),
+                    )
+                  : OutlinedButton(
+                      onPressed: enabled ? () => onPageSelected(i) : null,
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        shape: const CircleBorder(),
+                        side: const BorderSide(color: AppColors.pink),
+                      ),
+                      child: Text('${i + 1}'),
+                    ),
+            ),
+          IconButton(
+            tooltip: 'Next page',
+            onPressed: enabled && page < totalPages - 1
+                ? () => onPageSelected(page + 1)
+                : null,
+            icon: const Icon(Icons.chevron_right),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _ErrorView({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_outlined, size: 48),
+            const SizedBox(height: 12),
+            Text(
+              "Couldn't load products.",
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            FilledButton(onPressed: onRetry, child: const Text('Retry')),
           ],
         ),
       ),

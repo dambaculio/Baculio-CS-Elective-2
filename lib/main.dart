@@ -1,17 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'config/supabase_config.dart';
 import 'models/cart.dart';
 import 'models/flower.dart';
+import 'providers/product_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/order_list.dart';
 import 'screens/order_confirmation.dart';
 import 'screens/product_detail_screen.dart';
 import 'theme/design_theme.dart';
 
-void main() {
-  runApp(const MyApp());
+Future<void> main() async {
+  // Needed because we await a plugin call before runApp().
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: SupabaseConfig.url,
+    anonKey: SupabaseConfig.anonKey,
+  );
+
+  runApp(
+    // ProductProvider sits above the whole app so the home grid and the
+    // detail page share the same product state. init() loads page 1.
+    ChangeNotifierProvider(
+      create: (_) => ProductProvider()..init(),
+      child: const MyApp(),
+    ),
+  );
 }
+
+/// Global shortcut to the Supabase client, usable anywhere in the app.
+final supabase = Supabase.instance.client;
 
 /// Root widget. StatefulWidget because it owns both the current
 /// ThemeMode AND the shared cart — both are mutable state that the
@@ -84,6 +106,8 @@ class _MyAppState extends State<MyApp> {
         _favoriteIds.remove(productId);
       }
     });
+    // The Favorites tab is a Supabase query too, so keep it in sync.
+    context.read<ProductProvider>().setFavoriteIds(_favoriteIds);
   }
 
   /// Navigation 2.0 (go_router) route table:

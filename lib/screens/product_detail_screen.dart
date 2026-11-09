@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/models/flower.dart';
+import 'package:provider/provider.dart';
 
-import '../data/flower_data.dart';
+import '../providers/product_provider.dart';
 import '../theme/design_theme.dart';
 import '../widgets/product_image.dart';
 
@@ -44,6 +45,104 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
+  bool _loading = false;
+  bool _busy = false; // true while an update/delete is in flight
+
+  @override
+  void initState() {
+    super.initState();
+    // Opened directly (e.g. deep link) before the list loaded it:
+    // fetch this one product from Supabase.
+    if (context.read<ProductProvider>().findById(widget.productId) == null) {
+      _loading = true;
+      _loadProduct(); // initState can't be async, so call a helper
+    }
+  }
+
+  Future<void> _loadProduct() async {
+    try {
+      await context.read<ProductProvider>().loadProduct(widget.productId);
+    } catch (_) {
+      // Not found / offline: the "Product not found." view is shown.
+    } finally {
+      // The widget may have been closed while we waited.
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _showMessage(String text, {bool error = false}) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(text),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: error ? Colors.red.shade700 : null,
+        ),
+      );
+  }
+
+  Future<void> _editProduct(Flower product) async {
+    final changes = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => _EditProductDialog(product: product),
+    );
+    if (changes == null || changes.isEmpty || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      await context.read<ProductProvider>().updateProduct(product.id, changes);
+      _showMessage('Product updated.');
+    } catch (e) {
+      _showMessage('Update failed: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _deleteProduct(Flower product) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete product?'),
+        content: Text(
+          '"${product.name}" will be permanently removed from the shop.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      await context.read<ProductProvider>().deleteProduct(product.id);
+      navigator.pop(); // back to the shop
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('${product.name} deleted.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        _showMessage('Delete failed: $e', error: true);
+      }
+    }
+  }
+
   void _toggleFavorite() {
     setState(() => _isFavorite = !_isFavorite);
     widget.onToggleFavorite?.call();
@@ -51,11 +150,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final Flower? product = flowerList.cast<Flower?>().firstWhere(
-      (f) =>
-          f != null && (f.id == widget.productId || f.slug == widget.productId),
-      orElse: () => null,
+    final Flower? product = context.watch<ProductProvider>().findById(
+      widget.productId,
     );
+
+    if (product == null && (_loading || _busy)) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     if (product == null) {
       return Scaffold(
@@ -212,6 +313,45 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           );
                         }).toList(),
                       ),
+                    ],
+                    const SizedBox(height: 24),
+                    Text(
+                      'Manage Product',
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _busy
+                                ? null
+                                : () => _editProduct(product),
+                            icon: const Icon(Icons.edit_outlined),
+                            label: const Text('Edit'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _busy
+                                ? null
+                                : () => _deleteProduct(product),
+                            icon: const Icon(Icons.delete_outline),
+                            label: const Text('Delete'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.red,
+                              side: const BorderSide(color: Colors.red),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_busy) ...[
+                      const SizedBox(height: 12),
+                      const LinearProgressIndicator(),
                     ],
                   ],
                 ),
@@ -474,6 +614,130 @@ class _QuantityStepper extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+
+/// Form for editing a product. Returns only the columns that changed
+/// (as a map ready for Supabase .update()), or null if cancelled.
+class _EditProductDialog extends StatefulWidget {
+  final Flower product;
+
+  const _EditProductDialog({required this.product});
+
+  @override
+  State<_EditProductDialog> createState() => _EditProductDialogState();
+}
+
+class _EditProductDialogState extends State<_EditProductDialog> {
+  static const List<String> _categories = [
+    'Bouquet',
+    'Flowers',
+    'Wrappers',
+    'Ribbons',
+  ];
+
+  final _formKey = GlobalKey<FormState>();
+  late final _name = TextEditingController(text: widget.product.name);
+  late final _price = TextEditingController(
+    text: widget.product.price.toStringAsFixed(2),
+  );
+  late final _description = TextEditingController(
+    text: widget.product.description,
+  );
+  late String _category = _categories.contains(widget.product.category)
+      ? widget.product.category
+      : _categories.first;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _price.dispose();
+    _description.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+    final p = widget.product;
+    final name = _name.text.trim();
+    final price = double.parse(_price.text.trim());
+    final description = _description.text.trim();
+
+    final changes = <String, dynamic>{
+      if (name != p.name) 'name': name,
+      if (price != p.price) 'price': price,
+      if (description != p.description) 'description': description,
+      if (_category != p.category) 'category': _category,
+    };
+    Navigator.of(context).pop(changes);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit Product'),
+      content: SizedBox(
+        width: 400,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: _name,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _price,
+                  decoration: const InputDecoration(
+                    labelText: 'Price',
+                    prefixText: '\u20b1 ',
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  validator: (v) {
+                    final value = double.tryParse(v?.trim() ?? '');
+                    if (value == null) return 'Enter a valid number';
+                    if (value < 0) return 'Price cannot be negative';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _category,
+                  decoration: const InputDecoration(labelText: 'Category'),
+                  items: [
+                    for (final c in _categories)
+                      DropdownMenuItem(value: c, child: Text(c)),
+                  ],
+                  onChanged: (v) => setState(() => _category = v ?? _category),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _description,
+                  decoration: const InputDecoration(labelText: 'Description'),
+                  minLines: 2,
+                  maxLines: 5,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _save, child: const Text('Save')),
+      ],
     );
   }
 }

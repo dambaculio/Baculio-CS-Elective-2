@@ -1,3 +1,6 @@
+// NOTE: The app now loads products from the Supabase `products` table
+// (see lib/services/product_service.dart). This list is kept only as the
+// source the seed data in supabase/setup.sql was generated from.
 import '../models/flower.dart';
 
 const String _imageRoot = 'assets/images/';
