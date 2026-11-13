@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../theme/design_theme.dart';
 
-/// Circular floating cart button with a small item-count badge.
-/// Used as the floatingActionButton on both HomeScreen and
-/// ProductDetailScreen so the cart is always reachable.
 class FloatingCartButton extends StatelessWidget {
   final int itemCount;
   final VoidCallback onTap;
@@ -25,7 +22,6 @@ class FloatingCartButton extends StatelessWidget {
           backgroundColor: AppColors.hotPink,
           child: const Icon(Icons.shopping_cart, color: Colors.white),
         ),
-        // Badge only shows when the cart isn't empty.
         if (itemCount > 0)
           Positioned(
             right: -2,

@@ -8,9 +8,6 @@ import '../theme/design_theme.dart';
 import '../widgets/product_image.dart';
 import 'order_confirmation.dart';
 
-/// Shows everything currently in the cart before checkout.
-/// Flow: Product Page -> Add to Cart -> Floating Cart -> Order List
-/// (this page) -> Order Confirmation.
 class OrderListScreen extends StatelessWidget {
   const OrderListScreen({super.key});
 
@@ -19,7 +16,6 @@ class OrderListScreen extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
-    // watch -> this page rebuilds whenever the cart changes.
     final cart = context.watch<CartProvider>();
     final cartItems = cart.items;
 
@@ -161,8 +157,6 @@ class OrderListScreen extends StatelessWidget {
                       child: ElevatedButton(
                         onPressed: () {
                           final totalSnapshot = cart.total;
-                          // Copy the items (not just the list) so clearing
-                          // the cart doesn't affect the confirmation page.
                           final itemsSnapshot = cartItems
                               .map(
                                 (i) => CartItem(

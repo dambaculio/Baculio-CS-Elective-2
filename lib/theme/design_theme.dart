@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Brand palette — the ONLY place raw hex values are written.
 class AppColors {
   AppColors._();
 
@@ -9,6 +8,8 @@ class AppColors {
   static const Color lightPink = Color(0xFFFEECEB);
   static const Color backgroundColor = Color(0xFFF5F5F5);
   static const Color textColor = Color(0xFF000000);
+  static const Color subtleBorder = Color(0xFFE6E1E3);
+  static const Color mutedText = Color(0xFF8C8589);
 
   static const Color darkBackground = Color(0xFF1A1417);
   static const Color darkSurface = Color(0xFF2A2124);
@@ -27,15 +28,16 @@ class DesignTheme {
   );
 
   static ThemeData get lightTheme {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: AppColors.hotPink,
-      brightness: Brightness.light,
-    ).copyWith(
-      primary: AppColors.hotPink,
-      secondary: AppColors.pink,
-      tertiary: AppColors.lightPink,
-      surface: Colors.white,
-    );
+    final colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: AppColors.hotPink,
+          brightness: Brightness.light,
+        ).copyWith(
+          primary: AppColors.hotPink,
+          secondary: AppColors.pink,
+          tertiary: AppColors.lightPink,
+          surface: Colors.white,
+        );
 
     return ThemeData(
       useMaterial3: true,
@@ -69,15 +71,16 @@ class DesignTheme {
   }
 
   static ThemeData get darkTheme {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: AppColors.hotPink,
-      brightness: Brightness.dark,
-    ).copyWith(
-      primary: AppColors.hotPink,
-      secondary: AppColors.pink,
-      tertiary: AppColors.lightPink,
-      surface: AppColors.darkSurface,
-    );
+    final colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: AppColors.hotPink,
+          brightness: Brightness.dark,
+        ).copyWith(
+          primary: AppColors.hotPink,
+          secondary: AppColors.pink,
+          tertiary: AppColors.lightPink,
+          surface: AppColors.darkSurface,
+        );
 
     return ThemeData(
       useMaterial3: true,

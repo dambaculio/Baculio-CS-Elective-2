@@ -1,6 +1,4 @@
-
 enum DeviceType { compact, medium, expanded, large }
-
 
 DeviceType deviceTypeOf(double width) {
   if (width < 600) return DeviceType.compact;

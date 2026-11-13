@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../data/carousel_data.dart';
+import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/product_provider.dart';
 import '../theme/design_theme.dart';
@@ -40,12 +41,8 @@ class _HomeScreenState extends State<HomeScreen> {
     'Favorites',
   ];
 
-  /// Key on the results heading so we can scroll back to it when the
-  /// page changes.
   final GlobalKey _resultsKey = GlobalKey();
 
-  /// Slider position while the customer is still dragging. We only query
-  /// Supabase when they let go (onChangeEnd), not on every tick.
   RangeValues? _draftPrice;
 
   late final TextEditingController _searchController;
@@ -111,8 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
-          // Cart and chat icons removed from here — cart now lives
-          // as a floating button (see floatingActionButton below).
+          const _AccountMenu(),
           IconButton(
             icon: Icon(
               widget.themeMode == ThemeMode.light
@@ -267,7 +263,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    // Thin bar while a page/filter query is running.
                     SizedBox(
                       height: 4,
                       child: products.isLoading && flowers.isNotEmpty
@@ -291,8 +286,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               )
             else if (flowers.isEmpty &&
-                (products.isLoading ||
-                    products.state == ProductLoadState.idle))
+                (products.isLoading || products.state == ProductLoadState.idle))
               const SliverFillRemaining(
                 hasScrollBody: false,
                 child: Center(child: CircularProgressIndicator()),
@@ -335,8 +329,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               SliverPadding(
-                // Extra bottom space so the floating cart button never
-                // covers the page controls.
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
                 sliver: SliverToBoxAdapter(
                   child: _PaginationBar(
@@ -355,8 +347,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-/// Price range slider. Shows the selected range and lets the customer
-/// reset it back to "all prices".
 class _PriceFilter extends StatelessWidget {
   final RangeValues bounds;
   final RangeValues values;
@@ -380,7 +370,6 @@ class _PriceFilter extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    // ~₱10 steps; at least 1 division so the value labels show.
     final divisions = ((bounds.end - bounds.start) / 10).round().clamp(1, 1000);
 
     return Container(
@@ -445,10 +434,8 @@ class _PriceFilter extends StatelessWidget {
   }
 }
 
-/// Prev / numbered pages / Next. Shows at most 5 page numbers around
-/// the current page.
 class _PaginationBar extends StatelessWidget {
-  final int page; // zero-based
+  final int page;
   final int totalPages;
   final bool enabled;
   final ValueChanged<int> onPageSelected;
@@ -554,6 +541,60 @@ class _ErrorView extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AccountMenu extends StatelessWidget {
+  const _AccountMenu();
+
+  Future<void> _signOut(BuildContext context) async {
+    final auth = context.read<AuthProvider>();
+    final cart = context.read<CartProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await auth.signOut();
+      cart.clear();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Sign out failed: $e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final via = auth.signInMethod == 'github' ? 'GitHub' : 'Email';
+
+    return PopupMenuButton<String>(
+      tooltip: 'Account',
+      icon: const Icon(Icons.account_circle_outlined),
+      onSelected: (value) {
+        if (value == 'signout') _signOut(context);
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem<String>(
+          enabled: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                auth.email ?? 'Signed in',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text('Signed in with $via'),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem<String>(
+          value: 'signout',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.logout),
+            title: Text('Sign Out'),
+          ),
+        ),
+      ],
     );
   }
 }

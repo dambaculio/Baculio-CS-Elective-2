@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Shows a product image from either a network URL or a local asset.
-/// If imageUrl starts with 'assets/', it's loaded with Image.asset;
-/// otherwise it falls back to Image.network. This lets you swap
-/// individual products over to local photos one at a time.
 class ProductImage extends StatelessWidget {
   final String imageUrl;
   final BoxFit fit;

@@ -1,7 +1,3 @@
--- Shai's Creation: Supabase setup script
--- Run this once in Supabase Dashboard -> SQL Editor -> New query -> Run.
-
--- 1. Products table (mirrors lib/models/flower.dart)
 create table if not exists public.products (
   id          text primary key,
   name        text not null,
@@ -14,15 +10,9 @@ create table if not exists public.products (
   created_at  timestamptz not null default now()
 );
 
--- Indexes for the price filter and category filter
 create index if not exists products_price_idx    on public.products (price);
 create index if not exists products_category_idx on public.products (category);
 
--- 2. Row Level Security
--- With RLS on and no policies, the API returns nothing. The app has no
--- login, so these policies let the public (anon) key read and modify
--- products. Fine for a class activity; a real shop would restrict
--- insert/update/delete to authenticated admins.
 alter table public.products enable row level security;
 
 drop policy if exists "Public can read products"   on public.products;
@@ -35,9 +25,6 @@ create policy "Public can insert products" on public.products for insert with ch
 create policy "Public can update products" on public.products for update using (true) with check (true);
 create policy "Public can delete products" on public.products for delete using (true);
 
--- 3. Seed data (copied from lib/data/flower_data.dart).
--- image_url keeps the local asset path; ProductImage already loads
--- paths starting with 'assets/' via Image.asset.
 insert into public.products (id, name, price, image_url, category, description, slug, sort_order) values
   ('flowers-babys-breath', 'Baby''s Breath', 399, 'assets/images/Flowers - Baby''s Breath.png', 'Flowers', 'Delicate crochet baby''s breath blossoms, perfect for adding soft volume or subtle elegance.', '', 1),
   ('flowers-cosmos', 'Cosmos', 399, 'assets/images/Flowers - Cosmos.png', 'Flowers', 'Vibrant handcrafted cosmos flower featuring vivid petals and a charming detailed center.', '', 2),
@@ -70,5 +57,4 @@ on conflict (id) do update set
   category = excluded.category, description = excluded.description,
   slug = excluded.slug, sort_order = excluded.sort_order;
 
--- Check: should return 26
 select count(*) from public.products;

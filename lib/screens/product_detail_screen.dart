@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/models/flower.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../models/flower.dart';
 import '../providers/cart_provider.dart';
 import '../providers/product_provider.dart';
 import '../theme/design_theme.dart';
@@ -28,6 +28,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _quantity = 1;
   String? _selectedColor;
   late bool _isFavorite = widget.isFavorite;
+  bool _loading = false;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (context.read<ProductProvider>().findById(widget.productId) == null) {
+      _loading = true;
+      _loadProduct();
+    }
+  }
 
   @override
   void didUpdateWidget(covariant ProductDetailScreen oldWidget) {
@@ -37,27 +48,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
-  bool _loading = false;
-  bool _busy = false; // true while an update/delete is in flight
-
-  @override
-  void initState() {
-    super.initState();
-    // Opened directly (e.g. deep link) before the list loaded it:
-    // fetch this one product from Supabase.
-    if (context.read<ProductProvider>().findById(widget.productId) == null) {
-      _loading = true;
-      _loadProduct(); // initState can't be async, so call a helper
-    }
-  }
-
   Future<void> _loadProduct() async {
     try {
       await context.read<ProductProvider>().loadProduct(widget.productId);
-    } catch (_) {
-      // Not found / offline: the "Product not found." view is shown.
+    } catch (error) {
+      if (mounted) _showMessage('Could not load product: $error', error: true);
     } finally {
-      // The widget may have been closed while we waited.
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -121,8 +117,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     try {
       final cart = context.read<CartProvider>();
       await context.read<ProductProvider>().deleteProduct(product.id);
-      cart.remove(product.id); // a deleted product can't stay in the cart
-      navigator.pop(); // back to the shop
+      cart.remove(product.id);
+      navigator.pop();
       messenger.showSnackBar(
         SnackBar(
           content: Text('${product.name} deleted.'),
@@ -365,8 +361,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed:
-                          supportsColorChoice && _selectedColor == null
+                      onPressed: supportsColorChoice && _selectedColor == null
                           ? null
                           : () {
                               context.read<CartProvider>().add(
@@ -419,7 +414,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 );
                             },
                       icon: const Icon(Icons.shopping_cart_outlined),
-                      // Tell the customer why the button is disabled.
                       label: Text(
                         supportsColorChoice && _selectedColor == null
                             ? 'Choose a color'
@@ -616,9 +610,6 @@ class _QuantityStepper extends StatelessWidget {
   }
 }
 
-
-/// Form for editing a product. Returns only the columns that changed
-/// (as a map ready for Supabase .update()), or null if cancelled.
 class _EditProductDialog extends StatefulWidget {
   final Flower product;
 
@@ -687,8 +678,9 @@ class _EditProductDialogState extends State<_EditProductDialog> {
                 TextFormField(
                   controller: _name,
                   decoration: const InputDecoration(labelText: 'Name'),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Name is required'
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(

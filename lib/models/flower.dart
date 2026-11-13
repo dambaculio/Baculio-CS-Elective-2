@@ -1,7 +1,7 @@
 class Flower {
   final String id;
   final String name;
-  final double price; // or num/int based on your setup
+  final double price;
   final String imageUrl;
   final String category;
   final String description;
@@ -13,13 +13,10 @@ class Flower {
     required this.price,
     required this.imageUrl,
     this.category = '',
-    this.description = '', // Optional with default empty string
+    this.description = '',
     this.slug = '',
   });
 
-  /// Builds a Flower from a row of the Supabase `products` table.
-  /// Column names are snake_case in Postgres, so `image_url` maps to
-  /// `imageUrl`. `price` comes back as int or double, so use num.
   factory Flower.fromMap(Map<String, dynamic> map) {
     return Flower(
       id: map['id'] as String,
@@ -32,7 +29,6 @@ class Flower {
     );
   }
 
-  /// Converts a Flower into a map for insert/update calls.
   Map<String, dynamic> toMap() {
     return {
       'id': id,

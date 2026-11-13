@@ -1,5 +1,28 @@
 # Shai's Creation
 
+## Supabase Auth (branch `backend-auth`)
+
+Users must log in before shopping. Two sign-in options:
+
+- **Email + password** (Supabase email provider): Log In / Sign Up tabs on
+  `lib/screens/auth_screen.dart`, with email confirmation support.
+- **GitHub** (additional third-party provider): `signInWithOAuth(OAuthProvider.github)`
+  opens GitHub in the browser; Supabase redirects back to the app through the
+  deep link `io.supabase.shaiscreation://login-callback/`.
+
+How it fits together:
+
+- `lib/providers/auth_provider.dart` listens to the `onAuthStateChange`
+  stream and notifies the app on every login/logout.
+- `lib/main.dart`: go_router `redirect` + `refreshListenable` guard every
+  route, so signed-out users land on `/login` and signed-in users skip it.
+- Account menu (top bar) shows the user and sign-in method, plus Sign Out.
+- `supabase/auth_policies.sql`: RLS now lets only `authenticated` users
+  insert/update/delete products; browsing stays public.
+- Deep link registered in `AndroidManifest.xml`, `ios/Runner/Info.plist` and
+  `macos/Runner/Info.plist`. On the web, login returns to the current site.
+- GitHub icon: `mark-github` from GitHub's Octicons (MIT license).
+
 ## Supabase Backend (branch `backend-filter-pagination`)
 
 Products are stored in a Supabase Postgres table instead of a hard-coded list.

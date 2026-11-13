@@ -4,28 +4,28 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'config/supabase_config.dart';
+import 'providers/auth_provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/product_provider.dart';
+import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
-import 'screens/order_list.dart';
 import 'screens/order_confirmation.dart';
+import 'screens/order_list.dart';
 import 'screens/product_detail_screen.dart';
 import 'theme/design_theme.dart';
 
 Future<void> main() async {
-  // Needed because we await a plugin call before runApp().
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
     url: SupabaseConfig.url,
-    anonKey: SupabaseConfig.anonKey,
+    publishableKey: SupabaseConfig.publishableKey,
   );
 
   runApp(
-    // Providers sit above the whole app so every screen shares the same
-    // product and cart state. ProductProvider.init() loads page 1.
     MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => ProductProvider()..init()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
       ],
@@ -34,12 +34,6 @@ Future<void> main() async {
   );
 }
 
-/// Global shortcut to the Supabase client, usable anywhere in the app.
-final supabase = Supabase.instance.client;
-
-/// Root widget. StatefulWidget because it owns the current ThemeMode and
-/// the favorites set. Products and the cart live in providers (see
-/// main() above) so every screen rebuilds when they change.
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
@@ -49,6 +43,20 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.light;
+  final Set<String> _favoriteIds = <String>{};
+  late final GoRouter _router;
+
+  @override
+  void initState() {
+    super.initState();
+    _router = _buildRouter(context.read<AuthProvider>());
+  }
+
+  @override
+  void dispose() {
+    _router.dispose();
+    super.dispose();
+  }
 
   void _toggleTheme() {
     setState(() {
@@ -58,24 +66,26 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
-  final Set<String> _favoriteIds = <String>{};
-
   void _toggleFavorite(String productId) {
     setState(() {
       if (!_favoriteIds.add(productId)) {
         _favoriteIds.remove(productId);
       }
     });
-    // The Favorites tab is a Supabase query too, so keep it in sync.
     context.read<ProductProvider>().setFavoriteIds(_favoriteIds);
   }
 
-  /// Navigation 2.0 (go_router) route table:
-  ///   /              -> Home (Product Grid)
-  ///   /product/:id   -> Product Detail Page
-  ///   /cart          -> Order List Page
-  late final GoRouter _router = GoRouter(
+  GoRouter _buildRouter(AuthProvider auth) => GoRouter(
+    initialLocation: '/',
+    refreshListenable: auth,
+    redirect: (context, state) {
+      final onLogin = state.matchedLocation == '/login';
+      if (!auth.isSignedIn) return onLogin ? null : '/login';
+      if (onLogin) return '/';
+      return null;
+    },
     routes: [
+      GoRoute(path: '/login', builder: (context, state) => const AuthScreen()),
       GoRoute(
         path: '/',
         builder: (context, state) => HomeScreen(
