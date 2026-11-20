@@ -1,21 +1,31 @@
-enum DeviceType { compact, medium, expanded, large }
+import 'dart:math' as math;
 
-DeviceType deviceTypeOf(double width) {
-  if (width < 600) return DeviceType.compact;
-  if (width < 840) return DeviceType.medium;
-  if (width < 1200) return DeviceType.expanded;
-  return DeviceType.large;
-}
+import 'package:flutter/widgets.dart';
 
-int gridColumnsFor(DeviceType type) {
-  switch (type) {
-    case DeviceType.compact:
-      return 2;
-    case DeviceType.medium:
-      return 3;
-    case DeviceType.expanded:
-      return 3;
-    case DeviceType.large:
-      return 5;
-  }
+const double shopMaxWidth = 1200;
+const double formMaxWidth = 640;
+const double listMaxWidth = 760;
+
+double sidePadding(double screenWidth, {double maxWidth = shopMaxWidth}) =>
+    math.max(16, (screenWidth - maxWidth) / 2);
+
+class ResponsiveCenter extends StatelessWidget {
+  const ResponsiveCenter({
+    super.key,
+    required this.child,
+    this.maxWidth = listMaxWidth,
+  });
+
+  final Widget child;
+  final double maxWidth;
+
+  @override
+  Widget build(BuildContext context) => Align(
+    alignment: Alignment.topCenter,
+    heightFactor: 1,
+    child: ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: child,
+    ),
+  );
 }

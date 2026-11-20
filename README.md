@@ -1,92 +1,97 @@
-# Shai's Creation
+# Shai's Creation — E-Commerce App (Final Project)
 
-## Supabase Auth (branch `backend-auth`)
+A Flutter shop for handmade crochet flowers and bouquets with two roles:
+**admins** manage the catalog and orders, **customers** browse, build a cart,
+check out and review their orders.
 
-Users must log in before shopping. Two sign-in options:
+| Area | Used |
+|---|---|
+| State management | Riverpod 3 (`Notifier`, `AsyncNotifier`-style `FutureProvider`s) |
+| Backend | Supabase Auth, Postgres, Row Level Security, Storage |
+| Sign-in | Email + password, Google |
+| Images | Supabase Storage bucket `product-images` |
 
-- **Email + password** (Supabase email provider): Log In / Sign Up tabs on
-  `lib/screens/auth_screen.dart`, with email confirmation support.
-- **GitHub** (additional third-party provider): `signInWithOAuth(OAuthProvider.github)`
-  opens GitHub in the browser; Supabase redirects back to the app through the
-  deep link `io.supabase.shaiscreation://login-callback/`.
+## Setup
 
-How it fits together:
+1. **Database** – Supabase Dashboard → SQL Editor → run `supabase/final_project.sql`.
+   It creates the tables from the ERD, the `handle_new_user`, `is_admin` and
+   `place_order` functions, every RLS policy, the storage bucket and seed data.
+   (The old single `products` table from earlier activities is renamed to
+   `products_legacy`.)
+2. **Google sign-in** – create an OAuth client in Google Cloud Console and
+   paste its Client ID/Secret in Supabase → Authentication → Sign In / Providers → Google.
+3. **Redirect URLs** – Supabase → Authentication → URL Configuration must list
+   `io.supabase.shaiscreation://login-callback/` (and your web URL if deployed).
+   If you ran it before color options were added, also run
+   `supabase/product_colors.sql` once.
+4. **First admin** – sign up in the app, then run `supabase/make_admin.sql`
+   with that email. Every new account starts as a customer.
+5. `flutter pub get` → `flutter run`.
 
-- `lib/providers/auth_provider.dart` listens to the `onAuthStateChange`
-  stream and notifies the app on every login/logout.
-- `lib/main.dart`: go_router `redirect` + `refreshListenable` guard every
-  route, so signed-out users land on `/login` and signed-in users skip it.
-- Account menu (top bar) shows the user and sign-in method, plus Sign Out.
-- `supabase/auth_policies.sql`: RLS now lets only `authenticated` users
-  insert/update/delete products; browsing stays public.
-- Deep link registered in `AndroidManifest.xml`, `ios/Runner/Info.plist` and
-  `macos/Runner/Info.plist`. On the web, login returns to the current site.
-- GitHub icon: `mark-github` from GitHub's Octicons (MIT license).
+## Roles
 
-## Supabase Backend (branch `backend-filter-pagination`)
+| Capability | Signed out | Customer | Admin |
+|---|---|---|---|
+| Sign up / log in (email or Google) | ✓ | – | – |
+| View products and categories | ✗ | ✓ | ✓ |
+| Add / edit / delete products | ✗ | ✗ | ✓ |
+| Manage categories | ✗ | ✗ | ✓ |
+| Cart, place order, own order history | ✗ | ✓ | ✗ |
+| View all orders, update status | ✗ | ✗ | ✓ |
 
-Products are stored in a Supabase Postgres table instead of a hard-coded list.
+## Color options
 
-- **Setup:** run `supabase/setup.sql` in the Supabase SQL Editor (creates the
-  `products` table, RLS policies and 26 seed products), then put your project
-  URL and anon/publishable key in `lib/config/supabase_config.dart`.
-- **State management:** `provider` with a `ChangeNotifier`
-  (`lib/providers/product_provider.dart`) holds the filters, price range and
-  current page. Every change triggers one Supabase query built in
-  `lib/services/product_service.dart`.
-- **Filtering:** category (`.eq`), search (`.ilike`), favorites (`.inFilter`),
-  sort (`.order`).
-- **Price filter:** a `RangeSlider` on the home screen; the query uses
-  `.gte('price', min).lte('price', max)`.
-- **Pagination:** 6 products per page with `.range(from, to)` and
-  `.count(CountOption.exact)` for the total, with Prev / page numbers / Next.
-- **Update & delete:** on the product detail page (Edit / Delete buttons),
-  using `.update(...).eq('id', id)` and `.delete().eq('id', id)`.
+Admins choose which colors each product comes in (Add/Edit Product →
+Color options); leave all unselected for products without variations.
+Customers must pick one of those colors before adding to the cart. Each
+color is its own cart line and is saved on the order item, while stock is
+shared across colors. `place_order()` rejects missing or invalid colors.
 
-## Add Product Images
+## Security: why hiding a button is not security
 
-1. In the project root, create this folder:
+The app hides admin controls from customers, but that only changes what is
+drawn on screen. Anyone holding the public key could call the Supabase API
+directly. The real protection is in Postgres:
 
-   `assets/images/`
+- **RLS on every table** (`profiles`, `roles`, `categories`, `products`,
+  `orders`, `order_items`) with policies matching the permission table. No
+  policy exists for `anon`, so signed-out requests get nothing.
+- **`is_admin()`** decides admin-only writes. It is `security definer` so it
+  can read `profiles` without triggering the profiles policies again.
+- **Column privileges**: customers can only update their own `firstname` /
+  `lastname` (never `role_id`); admins can only change an order's `status`.
+- **Checkout integrity**: customers cannot insert orders directly.
+  `place_order()` runs in one transaction. It reads names, prices and stock
+  from the database, locks the product rows, rejects quantities above stock,
+  saves the order and its items (with a snapshot of name and unit price),
+  reduces stock, and sets the status to `done`. If anything fails, nothing is saved.
+- **Storage**: only admins can upload or change product images.
 
-2. Copy your image files into that folder, for example:
+## Architecture
 
-   ```text
-   assets/images/rose.jpg
-   assets/images/sunflower.jpg
-   assets/images/tulip.jpg
-   ```
+```
+lib/
+  models/      plain data classes (Product, ProductCategory, ShopOrder, Profile, CartItem)
+  services/    the only code that talks to Supabase
+  providers/   Riverpod providers that call services and hold app state
+  screens/     pages, which only read providers
+    auth/        login, sign up
+    shop/        product list and product page (both roles)
+    customer/    cart, order confirmation, order history
+    admin/       product form, all orders, categories
+  widgets/     reusable UI (cards, async/loading/error/empty views, dialogs)
+  utils/       error messages and formatting
+supabase/
+  final_project.sql   schema, functions, RLS, storage, seed, colors
+  product_colors.sql  update for databases created before color options
+  make_admin.sql      promote an account to admin
+  legacy/             SQL from earlier activities
+```
 
-3. The `pubspec.yaml` file registers the whole folder:
+Screens → providers → services → Supabase. Every async provider's loading,
+error (including permission denied) and data states are handled in the UI
+through `AsyncValueView` and the shared state views.
 
-   ```yaml
-   flutter:
-     uses-material-design: true
-     assets:
-       - assets/images/
-   ```
+## Credits
 
-   Keep the indentation exactly as shown. Run `flutter pub get` after changing
-   `pubspec.yaml`.
-
-4. Reference an image by its path in `lib/data/flower_data.dart`:
-
-   ```dart
-   Flower(
-     id: '22',
-     name: 'Rose Garden',
-     price: 699,
-     imageUrl: 'assets/images/rose.jpg',
-     category: 'Flowers',
-   ),
-   ```
-
-5. The reusable `ProductImage` widget detects paths beginning with `assets/`
-   and loads them with the equivalent Flutter API:
-
-   ```dart
-   Image.asset('assets/images/rose.jpg')
-   ```
-
-You can also use `Image.asset` directly in any widget. File names and paths are
-case-sensitive, so the spelling must match the file exactly.
+Google and GitHub marks: Simple Icons (CC0) and GitHub Octicons (MIT).

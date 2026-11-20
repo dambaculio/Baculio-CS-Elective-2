@@ -39,6 +39,10 @@
 	</array>
 	<key>FlutterDeepLinkingEnabled</key>
 	<false/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose a photo to use as a product image.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Take a photo to use as a product image.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
