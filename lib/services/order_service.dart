@@ -11,7 +11,8 @@ class OrderService {
 
   static const String _select =
       'id, created_at, user_id, status, total, '
-      'order_items(id, product_id, product_name, color, unit_price, quantity)';
+      'order_items(id, product_id, unit_price, quantity, '
+      'products(name))';
 
   Future<PlacedOrder> placeOrder(List<CartItem> items) async {
     final result = await _client.rpc(
@@ -19,11 +20,7 @@ class OrderService {
       params: {
         'p_items': [
           for (final item in items)
-            {
-              'product_id': item.product.id,
-              'quantity': item.quantity,
-              'color': item.color,
-            },
+            {'product_id': item.product.id, 'quantity': item.quantity},
         ],
       },
     );

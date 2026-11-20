@@ -9,9 +9,7 @@ import '../../models/product.dart';
 import '../../providers/category_providers.dart';
 import '../../providers/product_providers.dart';
 import '../../theme/design_theme.dart';
-import '../../theme/product_colors.dart';
 import '../../widgets/async_value_view.dart';
-import '../../widgets/color_swatch.dart';
 import '../../widgets/dialogs.dart';
 import '../../widgets/product_image.dart';
 import '../../widgets/state_views.dart';
@@ -83,7 +81,6 @@ class _ProductFormState extends ConsumerState<_ProductForm> {
   int? _categoryId;
   String? _existingImageUrl;
   PickedImage? _newImage;
-  late final Set<String> _colors;
   bool _saving = false;
 
   bool get _isEditing => widget.initial != null;
@@ -99,7 +96,6 @@ class _ProductFormState extends ConsumerState<_ProductForm> {
     );
     _stock = TextEditingController(text: product?.stock.toString() ?? '');
     _existingImageUrl = product?.imageUrl;
-    _colors = {...?product?.colors};
     final ids = widget.categories.map((c) => c.id).toSet();
     _categoryId = product != null && ids.contains(product.categoryId)
         ? product.categoryId
@@ -162,10 +158,6 @@ class _ProductFormState extends ConsumerState<_ProductForm> {
       stock: int.parse(_stock.text.trim()),
       categoryId: _categoryId!,
       imageUrl: _existingImageUrl,
-      colors: [
-        for (final option in productColorPalette)
-          if (_colors.contains(option.name)) option.name,
-      ],
     );
     setState(() => _saving = true);
     try {
@@ -330,48 +322,6 @@ class _ProductFormState extends ConsumerState<_ProductForm> {
                   : (v) => setState(() => _categoryId = v),
               validator: (v) => v == null ? 'Choose a category' : null,
             ),
-            const SizedBox(height: 20),
-            Text(
-              'Color options',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _colors.isEmpty
-                  ? 'None selected: customers buy this product without choosing a color.'
-                  : 'Customers must pick one of the ${_colors.length} selected colors.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final option in productColorPalette)
-                  FilterChip(
-                    avatar: ColorSwatchDot(colorName: option.name, size: 18),
-                    label: Text(option.name),
-                    selected: _colors.contains(option.name),
-                    showCheckmark: false,
-                    selectedColor: AppColors.pink,
-                    onSelected: _saving
-                        ? null
-                        : (on) => setState(
-                            () => on
-                                ? _colors.add(option.name)
-                                : _colors.remove(option.name),
-                          ),
-                  ),
-              ],
-            ),
-            if (_colors.isNotEmpty)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton(
-                  onPressed: _saving ? null : () => setState(_colors.clear),
-                  child: const Text('Clear colors'),
-                ),
-              ),
             const SizedBox(height: 28),
             FilledButton(
               onPressed: _saving ? null : _save,

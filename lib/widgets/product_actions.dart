@@ -11,11 +11,8 @@ void addProductToCart(
   WidgetRef ref,
   Product product, {
   int quantity = 1,
-  String? color,
 }) {
-  final result = ref
-      .read(cartProvider.notifier)
-      .add(product, quantity, color: color);
+  final result = ref.read(cartProvider.notifier).add(product, quantity);
   if (!result.success) {
     showAppSnackBar(context, result.message!, isError: true);
     return;
@@ -23,8 +20,7 @@ void addProductToCart(
   showAppSnackBar(
     context,
     result.message ??
-        '${product.name}${color != null ? ' ($color)' : ''}'
-            '${quantity > 1 ? ' ×$quantity' : ''} added to cart',
+        '${product.name}${quantity > 1 ? ' ×$quantity' : ''} added to cart',
   );
 }
 

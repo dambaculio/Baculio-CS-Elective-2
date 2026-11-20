@@ -12,7 +12,6 @@ import '../../providers/product_providers.dart';
 import '../../theme/design_theme.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/async_value_view.dart';
-import '../../widgets/color_swatch.dart';
 import '../../widgets/product_actions.dart';
 import '../../widgets/product_image.dart';
 import '../../widgets/quantity_stepper.dart';
@@ -31,7 +30,6 @@ class ProductDetailScreen extends ConsumerStatefulWidget {
 
 class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   int _quantity = 1;
-  String? _selectedColor;
 
   Future<void> _delete(Product product) async {
     final deleted = await confirmAndDeleteProduct(context, ref, product);
@@ -71,8 +69,6 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
         .fold(0, (sum, item) => sum + item.quantity);
     final available = product.stock - inCart;
     final quantity = available <= 0 ? 0 : _quantity.clamp(1, available);
-    final needsColor =
-        product.hasColors && !product.colors.contains(_selectedColor);
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -177,37 +173,6 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                   : product.description,
               style: textTheme.bodyMedium,
             ),
-            if (product.hasColors) ...[
-              const SizedBox(height: 20),
-              Text(
-                isAdmin ? 'Available colors' : 'Color *',
-                style: textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  for (final name in product.colors)
-                    ColorSwatchDot(
-                      colorName: name,
-                      selected: !isAdmin && _selectedColor == name,
-                      onTap: isAdmin
-                          ? null
-                          : () => setState(() => _selectedColor = name),
-                    ),
-                ],
-              ),
-              if (!isAdmin && _selectedColor != null) ...[
-                const SizedBox(height: 6),
-                Text(
-                  'Selected: $_selectedColor',
-                  style: textTheme.bodySmall?.copyWith(
-                    color: AppColors.mutedText,
-                  ),
-                ),
-              ],
-            ],
             if (!isAdmin && inCart > 0) ...[
               const SizedBox(height: 16),
               Text(
@@ -263,7 +228,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                 const SizedBox(width: 16),
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: available <= 0 || needsColor
+                    onPressed: available <= 0
                         ? null
                         : () {
                             addProductToCart(
@@ -271,7 +236,6 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                               ref,
                               product,
                               quantity: quantity,
-                              color: _selectedColor,
                             );
                             setState(() => _quantity = 1);
                           },
@@ -281,8 +245,6 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                           ? 'Out of stock'
                           : available <= 0
                           ? 'All in cart'
-                          : needsColor
-                          ? 'Choose a color'
                           : 'Add to Cart',
                     ),
                     style: FilledButton.styleFrom(

@@ -12,7 +12,7 @@ class ProductService {
 
   static const String _table = 'products';
   static const String _select =
-      'id, name, description, price, stock, image_url, category_id, colors, '
+      'id, name, description, price, stock, image_url, category_id, '
       'categories(name)';
 
   Future<ProductPage> fetchPage({
@@ -119,11 +119,18 @@ class ProductService {
   }
 
   Future<void> delete(int id) async {
-    final deleted = await _client
-        .from(_table)
-        .delete()
-        .eq('id', id)
-        .select('id');
+    final List<Map<String, dynamic>> deleted;
+    try {
+      deleted = await _client.from(_table).delete().eq('id', id).select('id');
+    } on PostgrestException catch (error) {
+      if (error.code == '23503') {
+        throw const AppException(
+          'This product is part of past orders, so it cannot be deleted. '
+          'Set its stock to 0 to stop selling it.',
+        );
+      }
+      rethrow;
+    }
     if (deleted.isEmpty) {
       throw const AppException(
         "You don't have permission to delete this product, or it no longer exists.",

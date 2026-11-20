@@ -10,7 +10,6 @@ class Product {
     this.description = '',
     this.imageUrl,
     this.categoryName,
-    this.colors = const [],
   });
 
   final int id;
@@ -21,10 +20,8 @@ class Product {
   final String? imageUrl;
   final int categoryId;
   final String? categoryName;
-  final List<String> colors;
 
   bool get inStock => stock > 0;
-  bool get hasColors => colors.isNotEmpty;
 
   factory Product.fromMap(Map<String, dynamic> map) {
     final category = map['categories'];
@@ -39,7 +36,6 @@ class Product {
       categoryName: category is Map<String, dynamic>
           ? category['name'] as String?
           : null,
-      colors: ((map['colors'] as List?) ?? const []).cast<String>(),
     );
   }
 }
@@ -52,7 +48,6 @@ class ProductDraft {
     required this.stock,
     required this.categoryId,
     this.imageUrl,
-    this.colors = const [],
   });
 
   final String name;
@@ -61,7 +56,6 @@ class ProductDraft {
   final int stock;
   final int categoryId;
   final String? imageUrl;
-  final List<String> colors;
 
   ProductDraft withImageUrl(String? url) => ProductDraft(
     name: name,
@@ -70,7 +64,6 @@ class ProductDraft {
     stock: stock,
     categoryId: categoryId,
     imageUrl: url,
-    colors: colors,
   );
 
   Map<String, dynamic> toMap() => {
@@ -80,7 +73,6 @@ class ProductDraft {
     'stock': stock,
     'category_id': categoryId,
     'image_url': imageUrl,
-    'colors': colors,
   };
 }
 

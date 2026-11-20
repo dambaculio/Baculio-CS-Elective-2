@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../models/order.dart';
 import '../theme/design_theme.dart';
 import '../utils/formatters.dart';
-import 'color_swatch.dart';
 
 class OrderCard extends StatelessWidget {
   const OrderCard({
@@ -96,28 +95,11 @@ class OrderCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      if (item.color != null) ...[
-                        ColorSwatchDot(colorName: item.color!, size: 12),
-                        const SizedBox(width: 5),
-                        Text(
-                          '${item.color} · ',
-                          style: textTheme.bodySmall?.copyWith(
-                            color: AppColors.mutedText,
-                          ),
-                        ),
-                      ],
-                      Flexible(
-                        child: Text(
-                          '${formatPeso(item.unitPrice)} × ${item.quantity}',
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: AppColors.mutedText,
-                          ),
-                        ),
-                      ),
-                    ],
+                  Text(
+                    '${formatPeso(item.unitPrice)} × ${item.quantity}',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: AppColors.mutedText,
+                    ),
                   ),
                 ],
               ),

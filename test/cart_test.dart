@@ -1,24 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:flutter_application_1/models/cart_item.dart';
 import 'package:flutter_application_1/models/product.dart';
 import 'package:flutter_application_1/providers/auth_providers.dart';
 import 'package:flutter_application_1/providers/cart_provider.dart';
 import 'package:flutter_application_1/utils/formatters.dart';
 
-Product _product({
-  int id = 1,
-  int stock = 3,
-  double price = 100,
-  List<String> colors = const [],
-}) => Product(
+Product _product({int id = 1, int stock = 3, double price = 100}) => Product(
   id: id,
   name: 'Rose $id',
   price: price,
   stock: stock,
   categoryId: 1,
-  colors: colors,
 );
 
 void main() {
@@ -56,7 +49,7 @@ void main() {
     expect(result.added, 3);
     expect(container.read(cartProvider).single.quantity, 3);
 
-    cart().updateQuantity(CartItem.keyFor(product.id, null), 10);
+    cart().updateQuantity(product.id, 10);
     expect(container.read(cartProvider).single.quantity, 3);
 
     expect(cart().add(product, 1).success, isFalse);
@@ -66,30 +59,11 @@ void main() {
     cart().add(_product(id: 1), 1);
     cart().add(_product(id: 2), 1);
 
-    cart().updateQuantity(CartItem.keyFor(1, null), 0);
+    cart().updateQuantity(1, 0);
     expect(container.read(cartProvider).map((i) => i.product.id), [2]);
 
     cart().clear();
     expect(container.read(cartProvider), isEmpty);
-  });
-
-  test('products with colors need a valid color', () {
-    final rose = _product(stock: 5, colors: ['Pink', 'Red']);
-
-    expect(cart().add(rose, 1).success, isFalse);
-    expect(cart().add(rose, 1, color: 'Blue').success, isFalse);
-    expect(cart().add(rose, 1, color: 'Pink').success, isTrue);
-  });
-
-  test('each color is its own line but stock is shared', () {
-    final rose = _product(stock: 3, colors: ['Pink', 'Red']);
-
-    cart().add(rose, 2, color: 'Pink');
-    final result = cart().add(rose, 5, color: 'Red');
-
-    expect(result.added, 1);
-    expect(container.read(cartProvider).length, 2);
-    expect(container.read(cartCountProvider), 3);
   });
 
   test('formats pesos with thousands separators', () {

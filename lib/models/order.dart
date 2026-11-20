@@ -32,13 +32,11 @@ class OrderItem {
     required this.unitPrice,
     required this.quantity,
     this.productId,
-    this.color,
   });
 
   final int id;
   final int? productId;
   final String productName;
-  final String? color;
   final double unitPrice;
   final int quantity;
 
@@ -47,12 +45,15 @@ class OrderItem {
   factory OrderItem.fromMap(Map<String, dynamic> map) => OrderItem(
     id: (map['id'] as num).toInt(),
     productId: (map['product_id'] as num?)?.toInt(),
-    productName: map['product_name'] as String,
-    color: map['color'] as String?,
+    productName: _nameFrom(map['products']),
     unitPrice: ((map['unit_price'] as num?) ?? 0).toDouble(),
     quantity: ((map['quantity'] as num?) ?? 0).toInt(),
   );
 }
+
+String _nameFrom(Object? product) => product is Map && product['name'] is String
+    ? product['name'] as String
+    : 'Product';
 
 class ShopOrder {
   const ShopOrder({
@@ -94,7 +95,7 @@ class ShopOrder {
       id: (map['id'] as num).toInt(),
       createdAt: DateTime.parse(map['created_at'] as String).toLocal(),
       userId: map['user_id'] as String?,
-      status: map['status'] as String,
+      status: (map['status'] as String?) ?? OrderStatus.pending,
       total: ((map['total'] as num?) ?? 0).toDouble(),
       items: rawItems
           .cast<Map<String, dynamic>>()

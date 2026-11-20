@@ -14,16 +14,16 @@ check out and review their orders.
 ## Setup
 
 1. **Database** – Supabase Dashboard → SQL Editor → run `supabase/final_project.sql`.
-   It creates the tables from the ERD, the `handle_new_user`, `is_admin` and
-   `place_order` functions, every RLS policy, the storage bucket and seed data.
-   (The old single `products` table from earlier activities is renamed to
-   `products_legacy`.)
+   It creates the six tables from the required schema, the `handle_new_user`,
+   `is_admin` and `place_order` functions, every RLS policy, the storage bucket
+   and seed data.
 2. **Google sign-in** – create an OAuth client in Google Cloud Console and
    paste its Client ID/Secret in Supabase → Authentication → Sign In / Providers → Google.
 3. **Redirect URLs** – Supabase → Authentication → URL Configuration must list
    `io.supabase.shaiscreation://login-callback/` (and your web URL if deployed).
-   If you ran it before color options were added, also run
-   `supabase/product_colors.sql` once.
+   If your database was created with an earlier version of the script, run
+   `supabase/strict_schema.sql` once. It removes everything that is not in the
+   required schema.
 4. **First admin** – sign up in the app, then run `supabase/make_admin.sql`
    with that email. Every new account starts as a customer.
 5. `flutter pub get` → `flutter run`.
@@ -38,14 +38,6 @@ check out and review their orders.
 | Manage categories | ✗ | ✗ | ✓ |
 | Cart, place order, own order history | ✗ | ✓ | ✗ |
 | View all orders, update status | ✗ | ✗ | ✓ |
-
-## Color options
-
-Admins choose which colors each product comes in (Add/Edit Product →
-Color options); leave all unselected for products without variations.
-Customers must pick one of those colors before adding to the cart. Each
-color is its own cart line and is saved on the order item, while stock is
-shared across colors. `place_order()` rejects missing or invalid colors.
 
 ## Security: why hiding a button is not security
 
@@ -63,9 +55,11 @@ directly. The real protection is in Postgres:
 - **Checkout integrity**: customers cannot insert orders directly.
   `place_order()` runs in one transaction. It reads names, prices and stock
   from the database, locks the product rows, rejects quantities above stock,
-  saves the order and its items (with a snapshot of name and unit price),
+  saves the order and its items (with the unit price paid),
   reduces stock, and sets the status to `done`. If anything fails, nothing is saved.
 - **Storage**: only admins can upload or change product images.
+- **Order history**: `order_items.product_id` is required, so a product that
+  appears in past orders cannot be deleted (set its stock to 0 instead).
 
 ## Architecture
 
@@ -82,8 +76,8 @@ lib/
   widgets/     reusable UI (cards, async/loading/error/empty views, dialogs)
   utils/       error messages and formatting
 supabase/
-  final_project.sql   schema, functions, RLS, storage, seed, colors
-  product_colors.sql  update for databases created before color options
+  final_project.sql   schema, functions, RLS, storage, seed
+  strict_schema.sql   one-time cleanup for databases made with older scripts
   make_admin.sql      promote an account to admin
   legacy/             SQL from earlier activities
 ```

@@ -7,7 +7,6 @@ import '../../providers/cart_provider.dart';
 import '../../providers/order_providers.dart';
 import '../../theme/design_theme.dart';
 import '../../utils/formatters.dart';
-import '../../widgets/color_swatch.dart';
 import '../../widgets/dialogs.dart';
 import '../../widgets/product_image.dart';
 import '../../widgets/quantity_stepper.dart';
@@ -60,9 +59,8 @@ class CartScreen extends ConsumerWidget {
                 itemBuilder: (context, index) {
                   final item = items[index];
                   final product = item.product;
-                  final maxQuantity = cart.maxQuantityFor(item);
                   return Dismissible(
-                    key: ValueKey(item.key),
+                    key: ValueKey(product.id),
                     direction: checkingOut
                         ? DismissDirection.none
                         : DismissDirection.endToStart,
@@ -75,7 +73,7 @@ class CartScreen extends ConsumerWidget {
                       ),
                       child: const Icon(Icons.delete, color: Colors.white),
                     ),
-                    onDismissed: (_) => cart.remove(item.key),
+                    onDismissed: (_) => cart.remove(product.id),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -93,22 +91,6 @@ class CartScreen extends ConsumerWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(product.name, style: textTheme.titleMedium),
-                              if (item.color != null) ...[
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    ColorSwatchDot(
-                                      colorName: item.color!,
-                                      size: 14,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      item.color!,
-                                      style: textTheme.bodySmall,
-                                    ),
-                                  ],
-                                ),
-                              ],
                               const SizedBox(height: 2),
                               Text(
                                 '${formatPeso(product.price)} each',
@@ -117,11 +99,11 @@ class CartScreen extends ConsumerWidget {
                                 ),
                               ),
                               Text(
-                                item.quantity >= maxQuantity
+                                item.quantity >= product.stock
                                     ? 'Max available: ${product.stock}'
                                     : '${product.stock} in stock',
                                 style: textTheme.bodySmall?.copyWith(
-                                  color: item.quantity >= maxQuantity
+                                  color: item.quantity >= product.stock
                                       ? Colors.orange.shade800
                                       : AppColors.mutedText,
                                 ),
@@ -144,7 +126,7 @@ class CartScreen extends ConsumerWidget {
                               color: Colors.red.shade600,
                               onPressed: checkingOut
                                   ? null
-                                  : () => cart.remove(item.key),
+                                  : () => cart.remove(product.id),
                               icon: const Icon(Icons.delete_outline),
                             ),
                             QuantityStepper(
@@ -153,14 +135,14 @@ class CartScreen extends ConsumerWidget {
                               onDecrease: checkingOut
                                   ? null
                                   : () => cart.updateQuantity(
-                                      item.key,
+                                      product.id,
                                       item.quantity - 1,
                                     ),
                               onIncrease:
-                                  checkingOut || item.quantity >= maxQuantity
+                                  checkingOut || item.quantity >= product.stock
                                   ? null
                                   : () => cart.updateQuantity(
-                                      item.key,
+                                      product.id,
                                       item.quantity + 1,
                                     ),
                             ),

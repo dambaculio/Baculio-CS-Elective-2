@@ -22,50 +22,24 @@ class CartNotifier extends Notifier<List<CartItem>> {
     return const [];
   }
 
-  int quantityOf(int productId) => state
-      .where((item) => item.product.id == productId)
-      .fold(0, (sum, item) => sum + item.quantity);
-
-  int maxQuantityFor(CartItem item) =>
-      item.product.stock - (quantityOf(item.product.id) - item.quantity);
-
-  CartAddResult add(Product product, int quantity, {String? color}) {
+  CartAddResult add(Product product, [int quantity = 1]) {
     if (!product.inStock) {
       return CartAddResult(
         added: 0,
         message: '${product.name} is out of stock.',
       );
     }
-    final String? chosenColor;
-    if (product.hasColors) {
-      if (color == null || !product.colors.contains(color)) {
-        return CartAddResult(
-          added: 0,
-          message: 'Choose a color for ${product.name} first.',
-        );
-      }
-      chosenColor = color;
-    } else {
-      chosenColor = null;
-    }
-
-    final room = product.stock - quantityOf(product.id);
+    final index = state.indexWhere((item) => item.product.id == product.id);
+    final current = index >= 0 ? state[index].quantity : 0;
+    final room = product.stock - current;
     if (room <= 0) {
       return CartAddResult(
         added: 0,
         message: 'All ${product.stock} available are already in your cart.',
       );
     }
-
     final added = math.min(quantity, room);
-    final key = CartItem.keyFor(product.id, chosenColor);
-    final index = state.indexWhere((item) => item.key == key);
-    final current = index >= 0 ? state[index].quantity : 0;
-    final updated = CartItem(
-      product: product,
-      quantity: current + added,
-      color: chosenColor,
-    );
+    final updated = CartItem(product: product, quantity: current + added);
     state = index >= 0 ? ([...state]..[index] = updated) : [...state, updated];
     return CartAddResult(
       added: added,
@@ -75,21 +49,21 @@ class CartNotifier extends Notifier<List<CartItem>> {
     );
   }
 
-  void updateQuantity(String key, int quantity) {
-    final index = state.indexWhere((item) => item.key == key);
+  void updateQuantity(int productId, int quantity) {
+    final index = state.indexWhere((item) => item.product.id == productId);
     if (index < 0) return;
     if (quantity <= 0) {
-      remove(key);
+      remove(productId);
       return;
     }
     final item = state[index];
-    final capped = math.min(quantity, maxQuantityFor(item));
-    if (capped <= 0 || capped == item.quantity) return;
+    final capped = math.min(quantity, item.product.stock);
+    if (capped == item.quantity) return;
     state = [...state]..[index] = item.copyWith(quantity: capped);
   }
 
-  void remove(String key) {
-    state = state.where((item) => item.key != key).toList();
+  void remove(int productId) {
+    state = state.where((item) => item.product.id != productId).toList();
   }
 
   void clear() => state = const [];

@@ -417,17 +417,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       actions: [
         IconButton(
           visualDensity: VisualDensity.compact,
-          tooltip: !product.inStock
-              ? 'Out of stock'
-              : product.hasColors
-              ? 'Choose a color'
-              : 'Add to cart',
+          tooltip: product.inStock ? 'Add to cart' : 'Out of stock',
           color: AppColors.hotPink,
-          onPressed: !product.inStock
-              ? null
-              : product.hasColors
-              ? open
-              : () => addProductToCart(context, ref, product),
+          onPressed: product.inStock
+              ? () => addProductToCart(context, ref, product)
+              : null,
           icon: const Icon(Icons.add_shopping_cart, size: 20),
         ),
       ],
